@@ -314,6 +314,30 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    if (email == "demo@review.com" && password == "Demo@123") {
+      const token = jwt.sign(
+        { userId: "demo-review-user" },
+        process.env.JWT_SECRET || 'fallback_secret_key',
+        { expiresIn: '90d' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Demo login successful",
+        user: {
+          _id: "demo-review-user",
+          username: "Google Review Demo",
+          email: "demo@review.com",
+          profilePicture: "",
+          bio: "Demo account for Google Play review",
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0
+        },
+        token: token
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -322,7 +346,7 @@ export const loginUser = async (req, res) => {
       },
       process.env.JWT_SECRET || 'fallback_secret_key',
       { 
-        expiresIn: '7d' 
+        expiresIn: '90d' 
       }
     );
 
