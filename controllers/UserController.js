@@ -1,14 +1,14 @@
-import mongoose from "mongoose";
-import User from "../models/userModel.js";
-import PendingUser from "../models/pendingUserModel.js";
-import Post from "../models/postModel.js";
-import FollowRequest from "../models/followRequestModel.js";
-import MergeRequest from "../models/mergeRequestModel.js";
-import MutualConnection from "../models/mutualConnectionModel.js";
-import { createNotification } from "./notificationController.js";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import sendEmail from "../config/nodeMailer.js";
+import mongoose from 'mongoose';
+import User from '../models/userModel.js';
+import PendingUser from '../models/pendingUserModel.js';
+import Post from '../models/postModel.js';
+import FollowRequest from '../models/followRequestModel.js';
+import MergeRequest from '../models/mergeRequestModel.js';
+import MutualConnection from '../models/mutualConnectionModel.js';
+import { createNotification } from './notificationController.js';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import sendEmail from '../config/nodeMailer.js';
 
 // Register a new user
 export async function register(request, response) {
@@ -17,9 +17,9 @@ export async function register(request, response) {
 
     // Validation
     if (!username || !email || !password) {
-      return response.status(400).json({
-        success: false,
-        message: "Username, email and password are required",
+      return response.status(400).json({ 
+        success: false, 
+        message: "Username, email and password are required" 
       });
     }
 
@@ -28,32 +28,24 @@ export async function register(request, response) {
     if (!emailRegex.test(email)) {
       return response.status(400).json({
         success: false,
-        message: "Please provide a valid email address",
+        message: "Please provide a valid email address"
       });
     }
 
     // Check if user already exists (finalized)
-    const existingUser = await User.findOne({
-      $or: [
-        { email: email.trim().toLowerCase() },
-        { username: username.trim() },
-      ],
+    const existingUser = await User.findOne({ 
+      $or: [{ email: email.trim().toLowerCase() }, { username: username.trim() }] 
     });
-
+    
     if (existingUser) {
-      return response.status(409).json({
-        success: false,
-        message:
-          existingUser.email === email.toLowerCase()
-            ? "Email already exists"
-            : "Username already taken",
+      return response.status(409).json({ 
+        success: false, 
+        message: existingUser.email === email.toLowerCase() ? "Email already exists" : "Username already taken" 
       });
     }
 
     // Also ensure no pending registration for this email
-    const existingPending = await PendingUser.findOne({
-      email: email.trim().toLowerCase(),
-    });
+    const existingPending = await PendingUser.findOne({ email: email.trim().toLowerCase() });
     if (existingPending) {
       await PendingUser.deleteOne({ _id: existingPending._id }); // replace with new OTP request
     }
@@ -64,19 +56,19 @@ export async function register(request, response) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
-
+    
     // Store as PendingUser until verified
     await PendingUser.create({
       username: username.trim(),
       email: email.trim().toLowerCase(),
       password: hashedPassword,
       otp,
-      otpExpires,
+      otpExpires
     });
 
     // Send verification email
     try {
-      const subject = "Welcome! Verify Your Account";
+      const subject = 'Welcome! Verify Your Account';
       const text = `Welcome to our platform! Your account has been created successfully with username: ${username}. Please verify your email address using the OTP: ${otp}. This OTP will expire in 10 minutes.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -94,25 +86,25 @@ export async function register(request, response) {
       await sendEmail(email, subject, text, html);
       console.log(`✅ OTP email sent successfully to: ${email}`);
     } catch (emailError) {
-      console.error("❌ Email sending failed during registration:");
-      console.error("   Email:", email);
-      console.error("   Error Code:", emailError.code);
-      console.error("   Error Message:", emailError.message);
-      console.error("   Full Error:", emailError);
+      console.error('❌ Email sending failed during registration:');
+      console.error('   Email:', email);
+      console.error('   Error Code:', emailError.code);
+      console.error('   Error Message:', emailError.message);
+      console.error('   Full Error:', emailError);
       // Don't fail registration if email fails, but log the error
     }
 
-    return response.status(200).json({
-      success: true,
-      message:
-        "OTP sent to email. Complete verification to create your account.",
+    return response.status(200).json({ 
+      success: true, 
+      message: "OTP sent to email. Complete verification to create your account."
     });
+
   } catch (error) {
-    console.error("Registration error:", error);
-    return response.status(500).json({
-      success: false,
+    console.error('Registration error:', error);
+    return response.status(500).json({ 
+      success: false, 
       message: "Internal server error during registration",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }
@@ -125,32 +117,32 @@ export async function verifyOTP(request, response) {
     if (!email || !otp) {
       return response.status(400).json({
         success: false,
-        message: "Email and OTP are required",
+        message: "Email and OTP are required"
       });
     }
 
-    const pending = await PendingUser.findOne({
+    const pending = await PendingUser.findOne({ 
       email: email.trim().toLowerCase(),
       otp: otp,
-      otpExpires: { $gt: new Date() },
+      otpExpires: { $gt: new Date() }
     });
 
     if (!pending) {
       return response.status(400).json({
         success: false,
-        message: "Invalid or expired OTP",
+        message: "Invalid or expired OTP"
       });
     }
 
     // Before creating, ensure no existing user was created during window
-    const existingUser = await User.findOne({
-      $or: [{ email: pending.email }, { username: pending.username }],
+    const existingUser = await User.findOne({ 
+      $or: [{ email: pending.email }, { username: pending.username }] 
     });
     if (existingUser) {
       await PendingUser.deleteOne({ _id: pending._id });
       return response.status(409).json({
         success: false,
-        message: "Account already exists for this email/username",
+        message: "Account already exists for this email/username"
       });
     }
 
@@ -159,7 +151,7 @@ export async function verifyOTP(request, response) {
       username: pending.username,
       email: pending.email,
       password: pending.password,
-      isVerified: true,
+      isVerified: true
     });
 
     // Remove the pending record
@@ -167,7 +159,7 @@ export async function verifyOTP(request, response) {
 
     // Send verification confirmation email
     try {
-      const subject = "Email Verification Successful";
+      const subject = 'Email Verification Successful';
       const text = `Hello ${user.username}, Congratulations! Your email address has been successfully verified. You can now enjoy all the features of our platform. Thank you for joining us!`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -189,10 +181,7 @@ export async function verifyOTP(request, response) {
 
       await sendEmail(user.email, subject, text, html);
     } catch (emailError) {
-      console.error(
-        "Verification confirmation email sending failed:",
-        emailError,
-      );
+      console.error('Verification confirmation email sending failed:', emailError);
       // Don't fail verification if email fails
     }
 
@@ -203,14 +192,15 @@ export async function verifyOTP(request, response) {
         _id: user._id,
         username: user.username,
         email: user.email,
-        isVerified: user.isVerified,
-      },
+        isVerified: user.isVerified
+      }
     });
+
   } catch (error) {
-    console.error("OTP verification error:", error);
+    console.error('OTP verification error:', error);
     return response.status(500).json({
       success: false,
-      message: "Internal server error during OTP verification",
+      message: "Internal server error during OTP verification"
     });
   }
 }
@@ -223,27 +213,19 @@ export async function resendOTP(request, response) {
     if (!email) {
       return response.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Email is required"
       });
     }
 
     // Look up pending registration
-    const pending = await PendingUser.findOne({
-      email: email.trim().toLowerCase(),
-    });
+    const pending = await PendingUser.findOne({ email: email.trim().toLowerCase() });
     if (!pending) {
       // If no pending, check if already verified user exists
-      const existing = await User.findOne({
-        email: email.trim().toLowerCase(),
-      });
+      const existing = await User.findOne({ email: email.trim().toLowerCase() });
       if (existing) {
-        return response
-          .status(400)
-          .json({ success: false, message: "Email is already verified" });
+        return response.status(400).json({ success: false, message: "Email is already verified" });
       }
-      return response
-        .status(404)
-        .json({ success: false, message: "No pending registration found" });
+      return response.status(404).json({ success: false, message: "No pending registration found" });
     }
 
     // Generate new OTP
@@ -256,7 +238,7 @@ export async function resendOTP(request, response) {
 
     // Send new OTP email
     try {
-      const subject = "New Verification OTP";
+      const subject = 'New Verification OTP';
       const text = `Here's your new verification OTP: ${otp}. This OTP will expire in 10 minutes.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -271,37 +253,72 @@ export async function resendOTP(request, response) {
 
       await sendEmail(email, subject, text, html);
     } catch (emailError) {
-      console.error("Email sending failed:", emailError);
+      console.error('Email sending failed:', emailError);
       return response.status(500).json({
         success: false,
-        message: "Failed to send OTP email",
+        message: "Failed to send OTP email"
       });
     }
 
     return response.status(200).json({
       success: true,
-      message: "New OTP sent successfully",
+      message: "New OTP sent successfully"
     });
+
   } catch (error) {
-    console.error("Resend OTP error:", error);
+    console.error('Resend OTP error:', error);
     return response.status(500).json({
       success: false,
-      message: "Internal server error during OTP resend",
+      message: "Internal server error during OTP resend"
     });
   }
 }
 
 // Login user
-export const loginUser = async (req, res) => {
+export const loginUser = async (req, res) => {  
   try {
     const { email, password } = req.body;
 
-    // ⭐ DEMO LOGIN FIRST
-    if (email === "demo@review.com" && password === "Demo@123") {
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address"
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    if (email == "demo@review.com" && password == "Demo@123") {
       const token = jwt.sign(
         { userId: "demo-review-user" },
-        process.env.JWT_SECRET || "fallback_secret_key",
-        { expiresIn: "90d" },
+        process.env.JWT_SECRET || 'fallback_secret_key',
+        { expiresIn: '90d' }
       );
 
       return res.status(200).json({
@@ -311,228 +328,117 @@ export const loginUser = async (req, res) => {
           _id: "demo-review-user",
           username: "Google Review Demo",
           email: "demo@review.com",
+          profilePicture: "",
           bio: "Demo account for Google Play review",
           followersCount: 0,
           followingCount: 0,
-          postsCount: 0,
+          postsCount: 0
         },
-        token,
+        token: token
       });
     }
 
-    // Normal validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
+    // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || "fallback_secret_key",
-      { expiresIn: "90d" },
+      { 
+        userId: user._id,
+      
+      },
+      process.env.JWT_SECRET || 'fallback_secret_key',
+      { 
+        expiresIn: '90d' 
+      }
     );
+
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+    });
+
+    // Send login notification email
+    try {
+      const currentTime = new Date().toLocaleString();
+      const subject = 'Login Notification';
+      const text = `Hello ${user.username}, You have successfully logged into your account at ${currentTime}. If you did not make this login, please change your password immediately and contact our support team.`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #007bff;">Login Notification</h2>
+          <p>Hello <strong>${user.username}</strong>,</p>
+          <p>You have successfully logged into your account.</p>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0; color: #6c757d;">Login Details:</p>
+            <p style="margin: 5px 0;"><strong>Username:</strong> ${user.username}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
+            <p style="margin: 5px 0;"><strong>Login Time:</strong> ${currentTime}</p>
+            <p style="margin: 5px 0;"><strong>Session Duration:</strong> 7 days</p>
+          </div>
+          <p>If you did not make this login, please change your password immediately and contact our support team.</p>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+          <p style="color: #999; font-size: 12px;">This is an automated security notification, please do not reply to this email.</p>
+        </div>
+      `;
+
+      await sendEmail(user.email, subject, text, html);
+    } catch (emailError) {
+      console.error('Login notification email sending failed:', emailError);
+      // Don't fail login if email fails
+    }
+
+    // Calculate followers and following counts
+    const followersCount = user.followers ? user.followers.length : 0;
+    const followingCount = user.following ? user.following.length : 0;
+
+    // Get posts count
+    let postsCount = user.postsCount || 0;
+    if (!user.postsCount || user.postsCount === undefined) {
+      postsCount = await Post.countDocuments({ user: user._id });
+      if (postsCount > 0) {
+        user.postsCount = postsCount;
+        await user.save();
+      }
+    }
+
+    // Remove password from response
+    const userResponse = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      bio: user.bio,
+      followers: user.followers,
+      following: user.following,
+      followersCount: followersCount,
+      followingCount: followingCount,
+      postsCount: postsCount,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
 
     res.status(200).json({
       success: true,
       message: "Login successful",
-      user,
-      token,
+      user: userResponse,
+      token: token
     });
+
   } catch (error) {
-    console.error("Login error:", error);
+    console.error('❌ Login error:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Internal server error during login",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
-
-// NORMAL LOGIN FLOW STARTS HERE
-
-// export const loginUser = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-
-//     // Validation
-//     if (!email || !password) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Email and password are required"
-//       });
-//     }
-
-//     // Validate email format
-//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-//     if (!emailRegex.test(email)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Please provide a valid email address"
-//       });
-//     }
-
-//     // Find user by email
-//     const user = await User.findOne({ email: email.trim().toLowerCase() });
-//     if (!user) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Invalid email or password"
-//       });
-//     }
-
-//     // Verify password
-//     const isPasswordValid = await bcrypt.compare(password, user.password);
-//     if (!isPasswordValid) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Invalid email or password"
-//       });
-//     }
-
-//     if (email == "demo@review.com" && password == "Demo@123") {
-//       const token = jwt.sign(
-//         { userId: "demo-review-user" },
-//         process.env.JWT_SECRET || 'fallback_secret_key',
-//         { expiresIn: '90d' }
-//       );
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Demo login successful",
-//         user: {
-//           _id: "demo-review-user",
-//           username: "Google Review Demo",
-//           email: "demo@review.com",
-//           profilePicture: "",
-//           bio: "Demo account for Google Play review",
-//           followersCount: 0,
-//           followingCount: 0,
-//           postsCount: 0
-//         },
-//         token: token
-//       });
-//     }
-
-//     // Generate JWT token
-//     const token = jwt.sign(
-//       {
-//         userId: user._id,
-
-//       },
-//       process.env.JWT_SECRET || 'fallback_secret_key',
-//       {
-//         expiresIn: '90d'
-//       }
-//     );
-
-//     // Set cookie
-//     res.cookie('token', token, {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === 'production',
-//       sameSite: 'none',
-//     });
-
-//     // Send login notification email
-//     try {
-//       const currentTime = new Date().toLocaleString();
-//       const subject = 'Login Notification';
-//       const text = `Hello ${user.username}, You have successfully logged into your account at ${currentTime}. If you did not make this login, please change your password immediately and contact our support team.`;
-//       const html = `
-//         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-//           <h2 style="color: #007bff;">Login Notification</h2>
-//           <p>Hello <strong>${user.username}</strong>,</p>
-//           <p>You have successfully logged into your account.</p>
-//           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-//             <p style="margin: 0; color: #6c757d;">Login Details:</p>
-//             <p style="margin: 5px 0;"><strong>Username:</strong> ${user.username}</p>
-//             <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
-//             <p style="margin: 5px 0;"><strong>Login Time:</strong> ${currentTime}</p>
-//             <p style="margin: 5px 0;"><strong>Session Duration:</strong> 7 days</p>
-//           </div>
-//           <p>If you did not make this login, please change your password immediately and contact our support team.</p>
-//           <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
-//           <p style="color: #999; font-size: 12px;">This is an automated security notification, please do not reply to this email.</p>
-//         </div>
-//       `;
-
-//       await sendEmail(user.email, subject, text, html);
-//     } catch (emailError) {
-//       console.error('Login notification email sending failed:', emailError);
-//       // Don't fail login if email fails
-//     }
-
-//     // Calculate followers and following counts
-//     const followersCount = user.followers ? user.followers.length : 0;
-//     const followingCount = user.following ? user.following.length : 0;
-
-//     // Get posts count
-//     let postsCount = user.postsCount || 0;
-//     if (!user.postsCount || user.postsCount === undefined) {
-//       postsCount = await Post.countDocuments({ user: user._id });
-//       if (postsCount > 0) {
-//         user.postsCount = postsCount;
-//         await user.save();
-//       }
-//     }
-
-//     // Remove password from response
-//     const userResponse = {
-//       _id: user._id,
-//       username: user.username,
-//       email: user.email,
-//       profilePicture: user.profilePicture,
-//       bio: user.bio,
-//       followers: user.followers,
-//       following: user.following,
-//       followersCount: followersCount,
-//       followingCount: followingCount,
-//       postsCount: postsCount,
-//       createdAt: user.createdAt,
-//       updatedAt: user.updatedAt
-//     };
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Login successful",
-//       user: userResponse,
-//       token: token
-//     });
-
-//   } catch (error) {
-//     console.error('❌ Login error:', error);
-//     console.error('Error details:', {
-//       name: error.name,
-//       message: error.message,
-//       code: error.code,
-//       stack: error.stack
-//     });
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Internal server error during login",
-//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
-//     });
-//   }
-// };
 
 // Forgot Password - Send reset OTP
 export const forgotPassword = async (req, res) => {
@@ -542,7 +448,7 @@ export const forgotPassword = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Email is required"
       });
     }
 
@@ -551,7 +457,7 @@ export const forgotPassword = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid email address",
+        message: "Please provide a valid email address"
       });
     }
 
@@ -560,7 +466,7 @@ export const forgotPassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found with this email address",
+        message: "User not found with this email address"
       });
     }
 
@@ -575,7 +481,7 @@ export const forgotPassword = async (req, res) => {
 
     // Send reset OTP email
     try {
-      const subject = "Password Reset Request";
+      const subject = 'Password Reset Request';
       const text = `Hello ${user.username}, You have requested to reset your password. Use the OTP below to reset your password: ${resetOTP}. This OTP will expire in 15 minutes. If you did not request this, please ignore this email.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -594,35 +500,36 @@ export const forgotPassword = async (req, res) => {
 
       await sendEmail(email, subject, text, html);
     } catch (emailError) {
-      console.error("Password reset email sending failed:", emailError);
+      console.error('Password reset email sending failed:', emailError);
       return res.status(500).json({
         success: false,
-        message: "Failed to send password reset email",
+        message: "Failed to send password reset email"
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Password reset OTP sent to your email address",
+      message: "Password reset OTP sent to your email address"
     });
+
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error('Forgot password error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during password reset request",
+      message: "Internal server error during password reset request"
     });
   }
 };
 
 // Reset Password - Verify OTP and set new password
-export const resetPassword = async (req, res) => {
+export const resetPassword = async (req, res) => {  
   try {
     const { email, newPassword, confirmPassword } = req.body;
 
     if (!email || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: "Email, newPassword and confirmPassword are required",
+        message: "Email, newPassword and confirmPassword are required"
       });
     }
 
@@ -631,7 +538,7 @@ export const resetPassword = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid email address",
+        message: "Please provide a valid email address"
       });
     }
 
@@ -639,14 +546,14 @@ export const resetPassword = async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters long",
+        message: "Password must be at least 6 characters long"
       });
     }
 
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: "newPassword and confirmPassword do not match",
+        message: "newPassword and confirmPassword do not match"
       });
     }
 
@@ -656,18 +563,15 @@ export const resetPassword = async (req, res) => {
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "User not found"
       });
     }
 
     // Ensure OTP was verified recently
-    if (
-      !user.resetPasswordVerifiedUntil ||
-      user.resetPasswordVerifiedUntil <= new Date()
-    ) {
+    if (!user.resetPasswordVerifiedUntil || user.resetPasswordVerifiedUntil <= new Date()) {
       return res.status(400).json({
         success: false,
-        message: "Reset OTP not verified or verification window expired",
+        message: "Reset OTP not verified or verification window expired"
       });
     }
 
@@ -682,7 +586,7 @@ export const resetPassword = async (req, res) => {
     // Send password reset confirmation email
     try {
       const currentTime = new Date().toLocaleString();
-      const subject = "Password Reset Successful";
+      const subject = 'Password Reset Successful';
       const text = `Hello ${user.username}, Your password has been successfully reset at ${currentTime}. If you did not make this change, please contact our support team immediately.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -703,22 +607,20 @@ export const resetPassword = async (req, res) => {
 
       await sendEmail(user.email, subject, text, html);
     } catch (emailError) {
-      console.error(
-        "Password reset confirmation email sending failed:",
-        emailError,
-      );
+      console.error('Password reset confirmation email sending failed:', emailError);
       // Don't fail password reset if email fails
     }
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully",
+      message: "Password reset successfully"
     });
+
   } catch (error) {
-    console.error("Reset password error:", error);
+    console.error('Reset password error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during password reset",
+      message: "Internal server error during password reset"
     });
   }
 };
@@ -731,7 +633,7 @@ export const verifyResetOTP = async (req, res) => {
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
-        message: "Email and OTP are required",
+        message: 'Email and OTP are required'
       });
     }
 
@@ -739,20 +641,20 @@ export const verifyResetOTP = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid email address",
+        message: 'Please provide a valid email address'
       });
     }
 
     const user = await User.findOne({
       email: email.trim().toLowerCase(),
       resetPasswordOTP: otp,
-      resetPasswordExpires: { $gt: new Date() },
-    }).select("_id email username");
+      resetPasswordExpires: { $gt: new Date() }
+    }).select('_id email username');
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP",
+        message: 'Invalid or expired OTP'
       });
     }
 
@@ -761,22 +663,20 @@ export const verifyResetOTP = async (req, res) => {
     await User.updateOne(
       { _id: user._id },
       {
-        $set: {
-          resetPasswordVerifiedUntil: new Date(Date.now() + verifyWindowMs),
-        },
-        $unset: { resetPasswordOTP: "", resetPasswordExpires: "" },
-      },
+        $set: { resetPasswordVerifiedUntil: new Date(Date.now() + verifyWindowMs) },
+        $unset: { resetPasswordOTP: "", resetPasswordExpires: "" }
+      }
     );
 
     return res.status(200).json({
       success: true,
-      message: "OTP verified successfully",
+      message: 'OTP verified successfully'
     });
   } catch (error) {
-    console.error("Verify reset OTP error:", error);
+    console.error('Verify reset OTP error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during OTP verification",
+      message: 'Internal server error during OTP verification'
     });
   }
 };
@@ -790,8 +690,7 @@ export const updateProfile = async (req, res) => {
     if (!username && !bio && !profilePicture) {
       return res.status(400).json({
         success: false,
-        message:
-          "At least one field (username, bio, or profilePicture) is required to update",
+        message: "At least one field (username, bio, or profilePicture) is required to update"
       });
     }
 
@@ -800,21 +699,21 @@ export const updateProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found"
       });
     }
 
     // Check if username is being changed and if it's already taken
     if (username && username !== user.username) {
-      const existingUser = await User.findOne({
+      const existingUser = await User.findOne({ 
         username: username.trim(),
-        _id: { $ne: userId },
+        _id: { $ne: userId }
       });
-
+      
       if (existingUser) {
         return res.status(409).json({
           success: false,
-          message: "Username already taken",
+          message: "Username already taken"
         });
       }
       user.username = username.trim();
@@ -833,7 +732,7 @@ export const updateProfile = async (req, res) => {
     // Send profile update notification email
     try {
       const currentTime = new Date().toLocaleString();
-      const subject = "Profile Updated Successfully";
+      const subject = 'Profile Updated Successfully';
       const text = `Hello ${user.username}, Your profile has been successfully updated at ${currentTime}. If you did not make these changes, please contact our support team immediately.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -844,7 +743,7 @@ export const updateProfile = async (req, res) => {
             <p style="margin: 0; color: #6c757d;">Profile Update Details:</p>
             <p style="margin: 5px 0;"><strong>Username:</strong> ${user.username}</p>
             <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
-            <p style="margin: 5px 0;"><strong>Bio:</strong> ${user.bio || "Not set"}</p>
+            <p style="margin: 5px 0;"><strong>Bio:</strong> ${user.bio || 'Not set'}</p>
             <p style="margin: 5px 0;"><strong>Update Time:</strong> ${currentTime}</p>
           </div>
           <p style="color: #dc3545;"><strong>Security Notice:</strong> If you did not make these profile changes, please contact our support team immediately.</p>
@@ -855,10 +754,7 @@ export const updateProfile = async (req, res) => {
 
       await sendEmail(user.email, subject, text, html);
     } catch (emailError) {
-      console.error(
-        "Profile update notification email sending failed:",
-        emailError,
-      );
+      console.error('Profile update notification email sending failed:', emailError);
       // Don't fail profile update if email fails
     }
 
@@ -890,19 +786,20 @@ export const updateProfile = async (req, res) => {
       postsCount: postsCount,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      updatedAt: user.updatedAt
     };
 
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      user: userResponse,
+      user: userResponse
     });
+
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error('Update profile error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during profile update",
+      message: "Internal server error during profile update"
     });
   }
 };
@@ -918,22 +815,20 @@ export const uploadProfilePicture = async (req, res) => {
     if (!file) {
       return res.status(400).json({
         success: false,
-        message: "Profile picture file is required",
+        message: 'Profile picture file is required'
       });
     }
 
-    if (!file.mimetype.startsWith("image/")) {
+    if (!file.mimetype.startsWith('image/')) {
       return res.status(400).json({
         success: false,
-        message: "Only image files are allowed for profile picture",
+        message: 'Only image files are allowed for profile picture'
       });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     // Save relative disk path
@@ -942,14 +837,14 @@ export const uploadProfilePicture = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Profile picture updated successfully",
-      profilePicture: user.profilePicture,
+      message: 'Profile picture updated successfully',
+      profilePicture: user.profilePicture
     });
   } catch (error) {
-    console.error("Upload profile picture error:", error);
+    console.error('Upload profile picture error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during profile picture upload",
+      message: 'Internal server error during profile picture upload'
     });
   }
 };
@@ -963,7 +858,7 @@ export const updateBio = async (req, res) => {
     if (bio === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Bio is required",
+        message: 'Bio is required'
       });
     }
 
@@ -971,12 +866,12 @@ export const updateBio = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Update bio
-    user.bio = bio || "";
+    user.bio = bio || '';
     await user.save();
 
     // Calculate followers and following counts
@@ -995,7 +890,7 @@ export const updateBio = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Bio updated successfully",
+      message: 'Bio updated successfully',
       user: {
         _id: user._id,
         username: user.username,
@@ -1004,14 +899,14 @@ export const updateBio = async (req, res) => {
         profilePicture: user.profilePicture,
         followersCount: followersCount,
         followingCount: followingCount,
-        postsCount: postsCount,
-      },
+        postsCount: postsCount
+      }
     });
   } catch (error) {
-    console.error("Update bio error:", error);
+    console.error('Update bio error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during bio update",
+      message: 'Internal server error during bio update'
     });
   }
 };
@@ -1026,14 +921,14 @@ export const deleteProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found"
       });
     }
 
     // Send account deletion notification email before deletion
     try {
       const currentTime = new Date().toLocaleString();
-      const subject = "Account Deletion Confirmation";
+      const subject = 'Account Deletion Confirmation';
       const text = `Hello ${user.username}, Your account has been permanently deleted at ${currentTime}. We're sorry to see you go. If you did not request this deletion, please contact our support team immediately as this action cannot be undone.`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -1056,10 +951,7 @@ export const deleteProfile = async (req, res) => {
 
       await sendEmail(user.email, subject, text, html);
     } catch (emailError) {
-      console.error(
-        "Account deletion notification email sending failed:",
-        emailError,
-      );
+      console.error('Account deletion notification email sending failed:', emailError);
       // Still proceed with deletion even if email fails
     }
 
@@ -1067,17 +959,18 @@ export const deleteProfile = async (req, res) => {
     await User.findByIdAndDelete(userId);
 
     // Clear authentication cookie
-    res.clearCookie("token");
+    res.clearCookie('token');
 
     return res.status(200).json({
       success: true,
-      message: "Account deleted successfully",
+      message: "Account deleted successfully"
     });
+
   } catch (error) {
-    console.error("Delete profile error:", error);
+    console.error('Delete profile error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during account deletion",
+      message: "Internal server error during account deletion"
     });
   }
 };
@@ -1087,14 +980,12 @@ export const getCurrentUser = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const user = await User.findById(userId).select(
-      "-password -otp -otpExpires -resetPasswordOTP -resetPasswordExpires",
-    );
-
+    const user = await User.findById(userId).select('-password -otp -otpExpires -resetPasswordOTP -resetPasswordExpires');
+    
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User not found"
       });
     }
 
@@ -1117,18 +1008,19 @@ export const getCurrentUser = async (req, res) => {
       ...user.toObject(),
       postsCount: postsCount,
       followersCount: followersCount,
-      followingCount: followingCount,
+      followingCount: followingCount
     };
 
     return res.status(200).json({
       success: true,
-      user: userResponse,
+      user: userResponse
     });
+
   } catch (error) {
-    console.error("Get current user error:", error);
+    console.error('Get current user error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Internal server error"
     });
   }
 };
@@ -1142,7 +1034,7 @@ export const followUser = async (req, res) => {
     if (!followUserId) {
       return res.status(400).json({
         success: false,
-        message: "User ID to follow is required",
+        message: 'User ID to follow is required'
       });
     }
 
@@ -1153,7 +1045,7 @@ export const followUser = async (req, res) => {
     if (currentUserIdStr === followUserIdStr) {
       return res.status(400).json({
         success: false,
-        message: "Cannot follow yourself",
+        message: 'Cannot follow yourself'
       });
     }
 
@@ -1161,7 +1053,7 @@ export const followUser = async (req, res) => {
     if (!userToFollow) {
       return res.status(404).json({
         success: false,
-        message: "User to follow not found",
+        message: 'User to follow not found'
       });
     }
 
@@ -1169,19 +1061,19 @@ export const followUser = async (req, res) => {
     if (!currentUser) {
       return res.status(404).json({
         success: false,
-        message: "Current user not found",
+        message: 'Current user not found'
       });
     }
 
     // Check if already following (convert to string for proper comparison)
     const isAlreadyFollowing = currentUser.following.some(
-      (id) => id.toString() === followUserIdStr,
+      id => id.toString() === followUserIdStr
     );
-
+    
     if (isAlreadyFollowing) {
       return res.status(400).json({
         success: false,
-        message: "Already following this user",
+        message: 'Already following this user'
       });
     }
 
@@ -1191,9 +1083,9 @@ export const followUser = async (req, res) => {
 
     // Add to user's followers list (only if not already in the list)
     const isAlreadyFollower = userToFollow.followers.some(
-      (id) => id.toString() === currentUserIdStr,
+      id => id.toString() === currentUserIdStr
     );
-
+    
     if (!isAlreadyFollower) {
       userToFollow.followers.push(userId);
       await userToFollow.save();
@@ -1201,15 +1093,16 @@ export const followUser = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "User followed successfully",
+      message: 'User followed successfully',
       following: currentUser.following.length,
-      followers: userToFollow.followers.length,
+      followers: userToFollow.followers.length
     });
+
   } catch (error) {
-    console.error("Follow user error:", error);
+    console.error('Follow user error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: 'Internal server error'
     });
   }
 };
@@ -1223,7 +1116,7 @@ export const unfollowUser = async (req, res) => {
     if (!unfollowUserId) {
       return res.status(400).json({
         success: false,
-        message: "User ID to unfollow is required",
+        message: 'User ID to unfollow is required'
       });
     }
 
@@ -1235,7 +1128,7 @@ export const unfollowUser = async (req, res) => {
     if (!userToUnfollow) {
       return res.status(404).json({
         success: false,
-        message: "User to unfollow not found",
+        message: 'User to unfollow not found'
       });
     }
 
@@ -1243,45 +1136,46 @@ export const unfollowUser = async (req, res) => {
     if (!currentUser) {
       return res.status(404).json({
         success: false,
-        message: "Current user not found",
+        message: 'Current user not found'
       });
     }
 
     // Check if currently following (convert to string for proper comparison)
     const isCurrentlyFollowing = currentUser.following.some(
-      (id) => id.toString() === unfollowUserIdStr,
+      id => id.toString() === unfollowUserIdStr
     );
-
+    
     if (!isCurrentlyFollowing) {
       return res.status(400).json({
         success: false,
-        message: "Not following this user",
+        message: 'Not following this user'
       });
     }
 
     // Remove from following list
     currentUser.following = currentUser.following.filter(
-      (id) => id.toString() !== unfollowUserIdStr,
+      id => id.toString() !== unfollowUserIdStr
     );
     await currentUser.save();
 
     // Remove from user's followers list
     userToUnfollow.followers = userToUnfollow.followers.filter(
-      (id) => id.toString() !== currentUserIdStr,
+      id => id.toString() !== currentUserIdStr
     );
     await userToUnfollow.save();
 
     return res.status(200).json({
       success: true,
-      message: "User unfollowed successfully",
+      message: 'User unfollowed successfully',
       following: currentUser.following.length,
-      followers: userToUnfollow.followers.length,
+      followers: userToUnfollow.followers.length
     });
+
   } catch (error) {
-    console.error("Unfollow user error:", error);
+    console.error('Unfollow user error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: 'Internal server error'
     });
   }
 };
@@ -1298,7 +1192,7 @@ export const toggleFollow = async (req, res) => {
     if (!followUserId) {
       return res.status(400).json({
         success: false,
-        message: "User ID is required",
+        message: 'User ID is required'
       });
     }
 
@@ -1309,38 +1203,38 @@ export const toggleFollow = async (req, res) => {
     if (currentUserIdStr === followUserIdStr) {
       return res.status(400).json({
         success: false,
-        message: "Cannot follow yourself",
+        message: 'Cannot follow yourself'
       });
     }
 
     // Find users
     const [currentUser, userToFollow] = await Promise.all([
       User.findById(userId),
-      User.findById(followUserId),
+      User.findById(followUserId)
     ]);
 
     if (!currentUser || !userToFollow) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Check if already following (in actual following array)
     const isCurrentlyFollowing = currentUser.following.some(
-      (id) => id.toString() === followUserIdStr,
+      id => id.toString() === followUserIdStr
     );
 
     // If already following, unfollow
     if (isCurrentlyFollowing) {
       // Remove from current user's following list
       currentUser.following = currentUser.following.filter(
-        (id) => id.toString() !== followUserIdStr,
+        id => id.toString() !== followUserIdStr
       );
-
+      
       // Remove from target user's followers list
       userToFollow.followers = userToFollow.followers.filter(
-        (id) => id.toString() !== currentUserIdStr,
+        id => id.toString() !== currentUserIdStr
       );
 
       await Promise.all([currentUser.save(), userToFollow.save()]);
@@ -1348,28 +1242,28 @@ export const toggleFollow = async (req, res) => {
       // Clean up any existing follow request (if any)
       await FollowRequest.findOneAndDelete({
         requester: userId,
-        recipient: followUserId,
+        recipient: followUserId
       });
 
       return res.status(200).json({
         success: true,
-        message: "User unfollowed successfully",
+        message: 'User unfollowed successfully',
         isFollowing: false,
-        action: "unfollowed",
+        action: 'unfollowed',
         followingCount: currentUser.following.length,
-        followersCount: userToFollow.followers.length,
+        followersCount: userToFollow.followers.length
       });
     }
 
     // If not following, follow directly (no request needed)
     // Add to current user's following list
     currentUser.following.push(followUserId);
-
+    
     // Add to target user's followers list (only if not already in the list)
     const isAlreadyFollower = userToFollow.followers.some(
-      (id) => id.toString() === currentUserIdStr,
+      id => id.toString() === currentUserIdStr
     );
-
+    
     if (!isAlreadyFollower) {
       userToFollow.followers.push(userId);
     }
@@ -1380,26 +1274,27 @@ export const toggleFollow = async (req, res) => {
     await createNotification(
       followUserId,
       userId,
-      "follow_accepted",
+      'follow_accepted',
       `${currentUser.username} started following you`,
       userToFollow._id,
-      "User",
-    ).catch((err) => console.error("Error creating follow notification:", err));
+      'User'
+    ).catch(err => console.error('Error creating follow notification:', err));
 
     return res.status(200).json({
       success: true,
-      message: "User followed successfully",
+      message: 'User followed successfully',
       isFollowing: true,
-      action: "followed",
+      action: 'followed',
       followingCount: currentUser.following.length,
-      followersCount: userToFollow.followers.length,
+      followersCount: userToFollow.followers.length
     });
+
   } catch (error) {
-    console.error("Toggle follow error:", error);
+    console.error('Toggle follow error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1414,20 +1309,20 @@ export const listFollowRequests = async (req, res) => {
       // Incoming: requests where current user is the recipient
       FollowRequest.find({
         recipient: userId,
-        status: "pending",
+        status: 'pending'
       })
-        .populate("requester", "username profilePicture email")
+        .populate('requester', 'username profilePicture email')
         .sort({ createdAt: -1 })
         .lean(),
-
+      
       // Outgoing: requests where current user is the requester
       FollowRequest.find({
         requester: userId,
-        status: "pending",
+        status: 'pending'
       })
-        .populate("recipient", "username profilePicture email")
+        .populate('recipient', 'username profilePicture email')
         .sort({ createdAt: -1 })
-        .lean(),
+        .lean()
     ]);
 
     // Format the response
@@ -1441,17 +1336,17 @@ export const listFollowRequests = async (req, res) => {
           _id: req.requester._id,
           username: req.requester.username,
           profilePicture: req.requester.profilePicture,
-          email: req.requester.email,
-        },
+          email: req.requester.email
+        }
       }),
       ...(req.recipient && {
         recipient: {
           _id: req.recipient._id,
           username: req.recipient.username,
           profilePicture: req.recipient.profilePicture,
-          email: req.recipient.email,
-        },
-      }),
+          email: req.recipient.email
+        }
+      })
     });
 
     return res.status(200).json({
@@ -1461,15 +1356,16 @@ export const listFollowRequests = async (req, res) => {
       counts: {
         incoming: incoming.length,
         outgoing: outgoing.length,
-        total: incoming.length + outgoing.length,
-      },
+        total: incoming.length + outgoing.length
+      }
     });
+
   } catch (error) {
-    console.error("List follow requests error:", error);
+    console.error('List follow requests error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1485,7 +1381,7 @@ export const acceptFollowRequest = async (req, res) => {
     if (!request) {
       return res.status(404).json({
         success: false,
-        message: "Follow request not found",
+        message: 'Follow request not found'
       });
     }
 
@@ -1493,28 +1389,28 @@ export const acceptFollowRequest = async (req, res) => {
     if (request.recipient.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to accept this request",
+        message: 'Not authorized to accept this request'
       });
     }
 
     // Status check - only pending requests can be accepted
-    if (request.status !== "pending") {
+    if (request.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Cannot accept request. Request is already ${request.status}`,
+        message: `Cannot accept request. Request is already ${request.status}`
       });
     }
 
     // Find both users
     const [requester, recipient] = await Promise.all([
       User.findById(request.requester),
-      User.findById(request.recipient),
+      User.findById(request.recipient)
     ]);
 
     if (!requester || !recipient) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
@@ -1523,58 +1419,63 @@ export const acceptFollowRequest = async (req, res) => {
 
     // Add follow relationship
     // Add recipient to requester's following list
-    if (!requester.following.some((id) => id.toString() === recipientIdStr)) {
+    if (!requester.following.some(id => id.toString() === recipientIdStr)) {
       requester.following.push(recipient._id);
     }
 
     // Add requester to recipient's followers list
-    if (!recipient.followers.some((id) => id.toString() === requesterIdStr)) {
+    if (!recipient.followers.some(id => id.toString() === requesterIdStr)) {
       recipient.followers.push(requester._id);
     }
 
     // Update request status
-    request.status = "accepted";
+    request.status = 'accepted';
 
     // Save all changes in parallel
-    await Promise.all([requester.save(), recipient.save(), request.save()]);
+    await Promise.all([
+      requester.save(),
+      recipient.save(),
+      request.save()
+    ]);
 
     // Create notification for requester (follow request accepted)
     await createNotification(
       requester._id,
       recipient._id,
-      "follow_accepted",
+      'follow_accepted',
       `${recipient.username} accepted your follow request`,
       recipient._id,
-      "User",
-    ).catch((err) => console.error("Notification error:", err));
+      'User'
+    ).catch(err => console.error('Notification error:', err));
 
     return res.status(200).json({
       success: true,
-      message: "Follow request accepted successfully.",
+      message: 'Follow request accepted successfully.',
       isFollowing: true,
       request: {
         _id: request._id,
         status: request.status,
         requester: {
           _id: requester._id,
-          username: requester.username,
+          username: requester.username
         },
         recipient: {
           _id: recipient._id,
-          username: recipient.username,
-        },
+          username: recipient.username
+        }
       },
       counts: {
         following: requester.following.length,
-        followers: recipient.followers.length,
-      },
+        followers: recipient.followers.length
+      }
     });
+
   } catch (error) {
-    console.error("Accept follow request error:", error);
+    console.error('Accept follow request error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1590,7 +1491,7 @@ export const rejectFollowRequest = async (req, res) => {
     if (!request) {
       return res.status(404).json({
         success: false,
-        message: "Follow request not found",
+        message: 'Follow request not found'
       });
     }
 
@@ -1598,36 +1499,37 @@ export const rejectFollowRequest = async (req, res) => {
     if (request.recipient.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to reject this request",
+        message: 'Not authorized to reject this request'
       });
     }
 
     // Status check - only pending requests can be rejected
-    if (request.status !== "pending") {
+    if (request.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Cannot reject request. Request is already ${request.status}`,
+        message: `Cannot reject request. Request is already ${request.status}`
       });
     }
 
     // Update request status to rejected
-    request.status = "rejected";
+    request.status = 'rejected';
     await request.save();
 
     return res.status(200).json({
       success: true,
-      message: "Follow request rejected successfully",
+      message: 'Follow request rejected successfully',
       request: {
         _id: request._id,
-        status: request.status,
-      },
+        status: request.status
+      }
     });
+
   } catch (error) {
-    console.error("Reject follow request error:", error);
+    console.error('Reject follow request error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1641,7 +1543,7 @@ export const checkConnection = async (req, res) => {
     if (!otherUserId) {
       return res.status(400).json({
         success: false,
-        message: "Other user ID is required",
+        message: 'Other user ID is required'
       });
     }
 
@@ -1651,16 +1553,16 @@ export const checkConnection = async (req, res) => {
     if (!currentUser || !otherUser) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Convert to string for proper comparison with ObjectIds
     const isFollowing = currentUser.following.some(
-      (id) => id.toString() === otherUserId.toString(),
+      id => id.toString() === otherUserId.toString()
     );
     const isFollowedBy = otherUser.following.some(
-      (id) => id.toString() === userId.toString(),
+      id => id.toString() === userId.toString()
     );
     const isConnected = isFollowing && isFollowedBy;
 
@@ -1668,13 +1570,14 @@ export const checkConnection = async (req, res) => {
       success: true,
       isFollowing,
       isFollowedBy,
-      isConnected,
+      isConnected
     });
+
   } catch (error) {
-    console.error("Check connection error:", error);
+    console.error('Check connection error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: 'Internal server error'
     });
   }
 };
@@ -1688,7 +1591,7 @@ export const checkFollowRequestStatus = async (req, res) => {
     if (!targetUserId) {
       return res.status(400).json({
         success: false,
-        message: "Target user ID is required",
+        message: 'Target user ID is required'
       });
     }
 
@@ -1698,21 +1601,21 @@ export const checkFollowRequestStatus = async (req, res) => {
     if (currentUserIdStr === targetUserIdStr) {
       return res.status(400).json({
         success: false,
-        message: "Cannot check follow request status for yourself",
+        message: 'Cannot check follow request status for yourself'
       });
     }
 
     // Check if already following
-    const currentUser = await User.findById(userId).select("following");
-    const isFollowing =
-      currentUser?.following.some((id) => id.toString() === targetUserIdStr) ||
-      false;
+    const currentUser = await User.findById(userId).select('following');
+    const isFollowing = currentUser?.following.some(
+      id => id.toString() === targetUserIdStr
+    ) || false;
 
     // Check for pending follow request
     const pendingRequest = await FollowRequest.findOne({
       requester: userId,
       recipient: targetUserId,
-      status: "pending",
+      status: 'pending'
     });
 
     const hasPendingRequest = !!pendingRequest;
@@ -1722,18 +1625,14 @@ export const checkFollowRequestStatus = async (req, res) => {
       isFollowing,
       hasPendingRequest,
       requestId: pendingRequest?._id || null,
-      status: isFollowing
-        ? "following"
-        : hasPendingRequest
-          ? "pending"
-          : "none",
+      status: isFollowing ? 'following' : hasPendingRequest ? 'pending' : 'none'
     });
   } catch (error) {
-    console.error("Check follow request status error:", error);
+    console.error('Check follow request status error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1747,20 +1646,20 @@ export const checkFollowRequestByPost = async (req, res) => {
     if (!postId) {
       return res.status(400).json({
         success: false,
-        message: "Post ID is required",
+        message: 'Post ID is required'
       });
     }
 
     // Import Post model
-    const Post = (await import("../models/postModel.js")).default;
+    const Post = (await import('../models/postModel.js')).default;
 
     // Get post and populate user
-    const post = await Post.findById(postId).select("user");
-
+    const post = await Post.findById(postId).select('user');
+    
     if (!post) {
       return res.status(404).json({
         success: false,
-        message: "Post not found",
+        message: 'Post not found'
       });
     }
 
@@ -1774,21 +1673,21 @@ export const checkFollowRequestByPost = async (req, res) => {
         isOwnPost: true,
         isFollowing: false,
         hasPendingRequest: false,
-        status: "own_post",
+        status: 'own_post'
       });
     }
 
     // Check if already following
-    const currentUser = await User.findById(userId).select("following");
-    const isFollowing =
-      currentUser?.following.some((id) => id.toString() === postOwnerId) ||
-      false;
+    const currentUser = await User.findById(userId).select('following');
+    const isFollowing = currentUser?.following.some(
+      id => id.toString() === postOwnerId
+    ) || false;
 
     // Check for pending follow request
     const pendingRequest = await FollowRequest.findOne({
       requester: userId,
       recipient: post.user,
-      status: "pending",
+      status: 'pending'
     });
 
     const hasPendingRequest = !!pendingRequest;
@@ -1800,18 +1699,14 @@ export const checkFollowRequestByPost = async (req, res) => {
       isFollowing,
       hasPendingRequest,
       requestId: pendingRequest?._id || null,
-      status: isFollowing
-        ? "following"
-        : hasPendingRequest
-          ? "pending"
-          : "none",
+      status: isFollowing ? 'following' : hasPendingRequest ? 'pending' : 'none'
     });
   } catch (error) {
-    console.error("Check follow request by post error:", error);
+    console.error('Check follow request by post error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1829,7 +1724,7 @@ export const sendMergeRequest = async (req, res) => {
     if (!targetUserId) {
       return res.status(400).json({
         success: false,
-        message: "Target user ID is required",
+        message: 'Target user ID is required'
       });
     }
 
@@ -1839,19 +1734,19 @@ export const sendMergeRequest = async (req, res) => {
     if (currentUserIdStr === targetUserIdStr) {
       return res.status(400).json({
         success: false,
-        message: "Cannot send merge request to yourself",
+        message: 'Cannot send merge request to yourself'
       });
     }
 
     const [currentUser, targetUser] = await Promise.all([
       User.findById(userId),
-      User.findById(targetUserId),
+      User.findById(targetUserId)
     ]);
 
     if (!currentUser || !targetUser) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
@@ -1859,38 +1754,38 @@ export const sendMergeRequest = async (req, res) => {
     const existingRequest = await MergeRequest.findOne({
       $or: [
         { requester: userId, recipient: targetUserId },
-        { requester: targetUserId, recipient: userId },
+        { requester: targetUserId, recipient: userId }
       ],
-      status: "pending",
+      status: 'pending'
     });
 
     if (existingRequest) {
       return res.status(409).json({
         success: false,
-        message: "Merge request already exists",
+        message: 'Merge request already exists'
       });
     }
 
     // Check if mutual connection already exists
-    const [user1Id, user2Id] = [userId, targetUserId].sort((a, b) =>
-      a.toString().localeCompare(b.toString()),
+    const [user1Id, user2Id] = [userId, targetUserId].sort((a, b) => 
+      a.toString().localeCompare(b.toString())
     );
     const [id1, id2] = [user1Id.toString(), user2Id.toString()].sort();
     const connectionId = `${id1}_${id2}`;
-
+    
     const existingConnection = await MutualConnection.findOne({
       $or: [
         { user1: user1Id, user2: user2Id },
         { user1: user2Id, user2: user1Id },
-        { connectionId: connectionId },
+        { connectionId: connectionId }
       ],
-      isActive: true,
+      isActive: true
     });
 
     if (existingConnection) {
       return res.status(409).json({
         success: false,
-        message: "Mutual connection already exists",
+        message: 'Mutual connection already exists'
       });
     }
 
@@ -1898,55 +1793,53 @@ export const sendMergeRequest = async (req, res) => {
     const mergeRequest = await MergeRequest.create({
       requester: userId,
       recipient: targetUserId,
-      status: "pending",
+      status: 'pending'
     });
 
-    await mergeRequest.populate("requester", "username profilePicture");
-    await mergeRequest.populate("recipient", "username profilePicture");
+    await mergeRequest.populate('requester', 'username profilePicture');
+    await mergeRequest.populate('recipient', 'username profilePicture');
 
     // Create notification with detailed information
     await createNotification(
       targetUserId,
       userId,
-      "merge_request",
+      'merge_request',
       `${currentUser.username} sent you a merge request to create a mutual connection. Accept to enable messaging!`,
       mergeRequest._id,
-      "MergeRequest",
-    ).catch((err) =>
-      console.error("Error creating merge request notification:", err),
-    );
+      'MergeRequest'
+    ).catch(err => console.error('Error creating merge request notification:', err));
 
     return res.status(201).json({
       success: true,
-      message: "Merge request sent successfully",
+      message: 'Merge request sent successfully',
       request: {
         _id: mergeRequest._id,
         requester: {
           _id: mergeRequest.requester._id,
           username: mergeRequest.requester.username,
-          profilePicture: mergeRequest.requester.profilePicture,
+          profilePicture: mergeRequest.requester.profilePicture
         },
         recipient: {
           _id: mergeRequest.recipient._id,
           username: mergeRequest.recipient.username,
-          profilePicture: mergeRequest.recipient.profilePicture,
+          profilePicture: mergeRequest.recipient.profilePicture
         },
         status: mergeRequest.status,
-        createdAt: mergeRequest.createdAt,
-      },
+        createdAt: mergeRequest.createdAt
+      }
     });
   } catch (error) {
-    console.error("Send merge request error:", error);
+    console.error('Send merge request error:', error);
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Merge request already exists",
+        message: 'Merge request already exists'
       });
     }
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -1963,63 +1856,61 @@ export const acceptMergeRequest = async (req, res) => {
     if (!mergeRequest) {
       return res.status(404).json({
         success: false,
-        message: "Merge request not found",
+        message: 'Merge request not found'
       });
     }
 
     if (mergeRequest.recipient.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to accept this request",
+        message: 'Not authorized to accept this request'
       });
     }
 
-    if (mergeRequest.status !== "pending") {
+    if (mergeRequest.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Cannot accept request. Request is already ${mergeRequest.status}`,
+        message: `Cannot accept request. Request is already ${mergeRequest.status}`
       });
     }
 
     const [requester, recipient] = await Promise.all([
       User.findById(mergeRequest.requester),
-      User.findById(mergeRequest.recipient),
+      User.findById(mergeRequest.recipient)
     ]);
 
     if (!requester || !recipient) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Create mutual connection
-    const [user1Id, user2Id] = [requester._id, recipient._id].sort((a, b) =>
-      a.toString().localeCompare(b.toString()),
+    const [user1Id, user2Id] = [requester._id, recipient._id].sort((a, b) => 
+      a.toString().localeCompare(b.toString())
     );
     const [id1, id2] = [user1Id.toString(), user2Id.toString()].sort();
     const connectionId = `${id1}_${id2}`;
-
+    
     let mutualConnection = await MutualConnection.findOne({
       $or: [
         { user1: user1Id, user2: user2Id },
         { user1: user2Id, user2: user1Id },
-        { connectionId: connectionId },
-      ],
+        { connectionId: connectionId }
+      ]
     });
 
     if (!mutualConnection) {
-      const names = [requester.username, recipient.username].sort((a, b) =>
-        a.localeCompare(b),
-      );
+      const names = [requester.username, recipient.username].sort((a, b) => a.localeCompare(b));
       const displayName = `${names[0]} & ${names[1]}`;
-
+      
       mutualConnection = await MutualConnection.create({
         user1: user1Id,
         user2: user2Id,
         connectionId: connectionId,
         displayName: displayName,
-        isActive: true,
+        isActive: true
       });
 
       // Notify both users
@@ -2027,29 +1918,19 @@ export const acceptMergeRequest = async (req, res) => {
         createNotification(
           requester._id,
           recipient._id,
-          "mutual_connection_created",
+          'mutual_connection_created',
           `You and ${recipient.username} are now connected! Mutual connection profile created.`,
           mutualConnection._id,
-          "MutualConnection",
-        ).catch((err) =>
-          console.error(
-            "Error creating mutual connection notification for requester:",
-            err,
-          ),
-        ),
+          'MutualConnection'
+        ).catch(err => console.error('Error creating mutual connection notification for requester:', err)),
         createNotification(
           recipient._id,
           requester._id,
-          "mutual_connection_created",
+          'mutual_connection_created',
           `You and ${requester.username} are now connected! Mutual connection profile created.`,
           mutualConnection._id,
-          "MutualConnection",
-        ).catch((err) =>
-          console.error(
-            "Error creating mutual connection notification for recipient:",
-            err,
-          ),
-        ),
+          'MutualConnection'
+        ).catch(err => console.error('Error creating mutual connection notification for recipient:', err))
       ]);
     } else if (!mutualConnection.isActive) {
       mutualConnection.isActive = true;
@@ -2057,36 +1938,34 @@ export const acceptMergeRequest = async (req, res) => {
     }
 
     // Update merge request status
-    mergeRequest.status = "accepted";
+    mergeRequest.status = 'accepted';
     await mergeRequest.save();
 
     // Notify requester that merge request was accepted
     await createNotification(
       requester._id,
       recipient._id,
-      "merge_request_accepted",
+      'merge_request_accepted',
       `${recipient.username} accepted your merge request. Mutual connection created!`,
       mutualConnection._id,
-      "MutualConnection",
-    ).catch((err) =>
-      console.error("Error creating merge request accepted notification:", err),
-    );
+      'MutualConnection'
+    ).catch(err => console.error('Error creating merge request accepted notification:', err));
 
     return res.status(200).json({
       success: true,
-      message: "Merge request accepted. Mutual connection created.",
+      message: 'Merge request accepted. Mutual connection created.',
       mutualConnection: {
         _id: mutualConnection._id,
         connectionId: mutualConnection.connectionId,
-        displayName: mutualConnection.displayName,
-      },
+        displayName: mutualConnection.displayName
+      }
     });
   } catch (error) {
-    console.error("Accept merge request error:", error);
+    console.error('Accept merge request error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -2101,57 +1980,52 @@ export const rejectMergeRequest = async (req, res) => {
     if (!mergeRequest) {
       return res.status(404).json({
         success: false,
-        message: "Merge request not found",
+        message: 'Merge request not found'
       });
     }
 
     if (mergeRequest.recipient.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Not authorized to reject this request",
+        message: 'Not authorized to reject this request'
       });
     }
 
-    if (mergeRequest.status !== "pending") {
+    if (mergeRequest.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: `Cannot reject request. Request is already ${mergeRequest.status}`,
+        message: `Cannot reject request. Request is already ${mergeRequest.status}`
       });
     }
 
-    mergeRequest.status = "rejected";
+    mergeRequest.status = 'rejected';
     await mergeRequest.save();
 
     // Notify requester that merge request was rejected
     const requester = await User.findById(mergeRequest.requester);
     const recipient = await User.findById(mergeRequest.recipient);
-
+    
     if (requester && recipient) {
       await createNotification(
         requester._id,
         recipient._id,
-        "merge_request_rejected",
+        'merge_request_rejected',
         `${recipient.username} rejected your merge request`,
         mergeRequest._id,
-        "MergeRequest",
-      ).catch((err) =>
-        console.error(
-          "Error creating merge request rejected notification:",
-          err,
-        ),
-      );
+        'MergeRequest'
+      ).catch(err => console.error('Error creating merge request rejected notification:', err));
     }
 
     return res.status(200).json({
       success: true,
-      message: "Merge request rejected successfully",
+      message: 'Merge request rejected successfully'
     });
   } catch (error) {
-    console.error("Reject merge request error:", error);
+    console.error('Reject merge request error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -2163,30 +2037,30 @@ export const getMergeRequests = async (req, res) => {
 
     const mergeRequests = await MergeRequest.find({
       recipient: userId,
-      status: "pending",
+      status: 'pending'
     })
-      .populate("requester", "username profilePicture")
+      .populate('requester', 'username profilePicture')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
-      mergeRequests: mergeRequests.map((req) => ({
+      mergeRequests: mergeRequests.map(req => ({
         _id: req._id,
         requester: {
           _id: req.requester._id,
           username: req.requester.username,
-          profilePicture: req.requester.profilePicture,
+          profilePicture: req.requester.profilePicture
         },
         status: req.status,
-        createdAt: req.createdAt,
-      })),
+        createdAt: req.createdAt
+      }))
     });
   } catch (error) {
-    console.error("Get merge requests error:", error);
+    console.error('Get merge requests error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -2201,26 +2075,26 @@ export const checkMergeRequestStatus = async (req, res) => {
     const mergeRequest = await MergeRequest.findOne({
       $or: [
         { requester: userId, recipient: targetUserId },
-        { requester: targetUserId, recipient: userId },
+        { requester: targetUserId, recipient: userId }
       ],
-      status: "pending",
+      status: 'pending'
     });
 
     // Check if mutual connection already exists
     const mutualConnection = await MutualConnection.findOne({
       $and: [
         { $or: [{ user1: userId }, { user2: userId }] },
-        { $or: [{ user1: targetUserId }, { user2: targetUserId }] },
+        { $or: [{ user1: targetUserId }, { user2: targetUserId }] }
       ],
-      isActive: true,
+      isActive: true
     });
 
-    console.log("Check merge request status:", {
+    console.log('Check merge request status:', {
       userId: userId.toString(),
       targetUserId: targetUserId.toString(),
       hasPendingRequest: !!mergeRequest,
       hasMutualConnection: !!mutualConnection,
-      mutualConnectionId: mutualConnection?._id?.toString() || null,
+      mutualConnectionId: mutualConnection?._id?.toString() || null
     });
 
     return res.status(200).json({
@@ -2228,16 +2102,15 @@ export const checkMergeRequestStatus = async (req, res) => {
       hasPendingRequest: !!mergeRequest,
       hasMutualConnection: !!mutualConnection,
       requestId: mergeRequest?._id || null,
-      isRequester:
-        mergeRequest?.requester.toString() === userId.toString() || false,
-      mutualConnectionId: mutualConnection?._id || null,
+      isRequester: mergeRequest?.requester.toString() === userId.toString() || false,
+      mutualConnectionId: mutualConnection?._id || null
     });
   } catch (error) {
-    console.error("Check merge request status error:", error);
+    console.error('Check merge request status error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -2246,21 +2119,22 @@ export const checkMergeRequestStatus = async (req, res) => {
 export const logoutUser = async (req, res) => {
   try {
     // Clear the authentication cookie
-    res.clearCookie("token", {
+    res.clearCookie('token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
     });
 
     return res.status(200).json({
       success: true,
-      message: "Logged out successfully",
+      message: "Logged out successfully"
     });
+
   } catch (error) {
-    console.error("Logout error:", error);
+    console.error('Logout error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error during logout",
+      message: "Internal server error during logout"
     });
   }
 };
@@ -2272,30 +2146,29 @@ export const getFollowers = async (req, res) => {
     const currentUserId = req.user?.userId;
 
     const user = await User.findById(userId)
-      .populate("followers", "username profilePicture email bio isVerified")
-      .select("followers");
+      .populate('followers', 'username profilePicture email bio isVerified')
+      .select('followers');
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Format followers with follow status if current user is viewing
     let followersList = user.followers || [];
     if (currentUserId) {
-      const currentUser =
-        await User.findById(currentUserId).select("following");
+      const currentUser = await User.findById(currentUserId).select('following');
       const currentUserFollowing = currentUser?.following || [];
-
+      
       followersList = followersList.map((follower) => {
         const followerObj = follower.toObject ? follower.toObject() : follower;
         return {
           ...followerObj,
           isFollowing: currentUserFollowing.some(
-            (id) => id.toString() === followerObj._id.toString(),
-          ),
+            (id) => id.toString() === followerObj._id.toString()
+          )
         };
       });
     }
@@ -2303,14 +2176,15 @@ export const getFollowers = async (req, res) => {
     return res.status(200).json({
       success: true,
       followers: followersList,
-      count: followersList.length,
+      count: followersList.length
     });
+
   } catch (error) {
-    console.error("Get followers error:", error);
+    console.error('Get followers error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -2322,32 +2196,29 @@ export const getFollowing = async (req, res) => {
     const currentUserId = req.user?.userId;
 
     const user = await User.findById(userId)
-      .populate("following", "username profilePicture email bio isVerified")
-      .select("following");
+      .populate('following', 'username profilePicture email bio isVerified')
+      .select('following');
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found'
       });
     }
 
     // Format following with follow status if current user is viewing
     let followingList = user.following || [];
     if (currentUserId) {
-      const currentUser =
-        await User.findById(currentUserId).select("following");
+      const currentUser = await User.findById(currentUserId).select('following');
       const currentUserFollowing = currentUser?.following || [];
-
+      
       followingList = followingList.map((following) => {
-        const followingObj = following.toObject
-          ? following.toObject()
-          : following;
+        const followingObj = following.toObject ? following.toObject() : following;
         return {
           ...followingObj,
           isFollowing: currentUserFollowing.some(
-            (id) => id.toString() === followingObj._id.toString(),
-          ),
+            (id) => id.toString() === followingObj._id.toString()
+          )
         };
       });
     }
@@ -2355,14 +2226,15 @@ export const getFollowing = async (req, res) => {
     return res.status(200).json({
       success: true,
       following: followingList,
-      count: followingList.length,
+      count: followingList.length
     });
+
   } catch (error) {
-    console.error("Get following error:", error);
+    console.error('Get following error:', error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
