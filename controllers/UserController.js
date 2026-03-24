@@ -275,50 +275,16 @@ export async function resendOTP(request, response) {
 }
 
 // Login user
-export const loginUser = async (req, res) => {  
+export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required"
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide a valid email address"
-      });
-    }
-
-    // Find user by email
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password"
-      });
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password"
-      });
-    }
-
-    if (email == "demo@review.com" && password == "Demo@123") {
+    // DEMO LOGIN FOR GOOGLE PLAY REVIEW
+    if (email === "demo@review.com" && password === "Demo@123") {
       const token = jwt.sign(
         { userId: "demo-review-user" },
-        process.env.JWT_SECRET || 'fallback_secret_key',
-        { expiresIn: '90d' }
+        process.env.JWT_SECRET || "fallback_secret_key",
+        { expiresIn: "90d" }
       );
 
       return res.status(200).json({
@@ -328,117 +294,234 @@ export const loginUser = async (req, res) => {
           _id: "demo-review-user",
           username: "Google Review Demo",
           email: "demo@review.com",
-          profilePicture: "",
           bio: "Demo account for Google Play review",
           followersCount: 0,
           followingCount: 0,
           postsCount: 0
         },
-        token: token
+        token
       });
     }
 
-    // Generate JWT token
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required"
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    // Check password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+    // Generate token
     const token = jwt.sign(
-      { 
-        userId: user._id,
-      
-      },
-      process.env.JWT_SECRET || 'fallback_secret_key',
-      { 
-        expiresIn: '90d' 
-      }
+      { userId: user._id },
+      process.env.JWT_SECRET || "fallback_secret_key",
+      { expiresIn: "90d" }
     );
-
-    // Set cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-    });
-
-    // Send login notification email
-    try {
-      const currentTime = new Date().toLocaleString();
-      const subject = 'Login Notification';
-      const text = `Hello ${user.username}, You have successfully logged into your account at ${currentTime}. If you did not make this login, please change your password immediately and contact our support team.`;
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #007bff;">Login Notification</h2>
-          <p>Hello <strong>${user.username}</strong>,</p>
-          <p>You have successfully logged into your account.</p>
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <p style="margin: 0; color: #6c757d;">Login Details:</p>
-            <p style="margin: 5px 0;"><strong>Username:</strong> ${user.username}</p>
-            <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
-            <p style="margin: 5px 0;"><strong>Login Time:</strong> ${currentTime}</p>
-            <p style="margin: 5px 0;"><strong>Session Duration:</strong> 7 days</p>
-          </div>
-          <p>If you did not make this login, please change your password immediately and contact our support team.</p>
-          <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
-          <p style="color: #999; font-size: 12px;">This is an automated security notification, please do not reply to this email.</p>
-        </div>
-      `;
-
-      await sendEmail(user.email, subject, text, html);
-    } catch (emailError) {
-      console.error('Login notification email sending failed:', emailError);
-      // Don't fail login if email fails
-    }
-
-    // Calculate followers and following counts
-    const followersCount = user.followers ? user.followers.length : 0;
-    const followingCount = user.following ? user.following.length : 0;
-
-    // Get posts count
-    let postsCount = user.postsCount || 0;
-    if (!user.postsCount || user.postsCount === undefined) {
-      postsCount = await Post.countDocuments({ user: user._id });
-      if (postsCount > 0) {
-        user.postsCount = postsCount;
-        await user.save();
-      }
-    }
-
-    // Remove password from response
-    const userResponse = {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      profilePicture: user.profilePicture,
-      bio: user.bio,
-      followers: user.followers,
-      following: user.following,
-      followersCount: followersCount,
-      followingCount: followingCount,
-      postsCount: postsCount,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt
-    };
 
     res.status(200).json({
       success: true,
       message: "Login successful",
-      user: userResponse,
-      token: token
+      user,
+      token
     });
 
   } catch (error) {
-    console.error('❌ Login error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code,
-      stack: error.stack
-    });
-    
+    console.error("Login error:", error);
+
     res.status(500).json({
       success: false,
-      message: "Internal server error during login",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: "Internal server error"
     });
   }
 };
+
+    // NORMAL LOGIN FLOW STARTS HERE
+
+  
+// export const loginUser = async (req, res) => {  
+//   try {
+//     const { email, password } = req.body;
+
+//     // Validation
+//     if (!email || !password) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email and password are required"
+//       });
+//     }
+
+//     // Validate email format
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide a valid email address"
+//       });
+//     }
+
+//     // Find user by email
+//     const user = await User.findOne({ email: email.trim().toLowerCase() });
+//     if (!user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Invalid email or password"
+//       });
+//     }
+
+//     // Verify password
+//     const isPasswordValid = await bcrypt.compare(password, user.password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Invalid email or password"
+//       });
+//     }
+
+//     if (email == "demo@review.com" && password == "Demo@123") {
+//       const token = jwt.sign(
+//         { userId: "demo-review-user" },
+//         process.env.JWT_SECRET || 'fallback_secret_key',
+//         { expiresIn: '90d' }
+//       );
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Demo login successful",
+//         user: {
+//           _id: "demo-review-user",
+//           username: "Google Review Demo",
+//           email: "demo@review.com",
+//           profilePicture: "",
+//           bio: "Demo account for Google Play review",
+//           followersCount: 0,
+//           followingCount: 0,
+//           postsCount: 0
+//         },
+//         token: token
+//       });
+//     }
+
+//     // Generate JWT token
+//     const token = jwt.sign(
+//       { 
+//         userId: user._id,
+      
+//       },
+//       process.env.JWT_SECRET || 'fallback_secret_key',
+//       { 
+//         expiresIn: '90d' 
+//       }
+//     );
+
+//     // Set cookie
+//     res.cookie('token', token, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'none',
+//     });
+
+//     // Send login notification email
+//     try {
+//       const currentTime = new Date().toLocaleString();
+//       const subject = 'Login Notification';
+//       const text = `Hello ${user.username}, You have successfully logged into your account at ${currentTime}. If you did not make this login, please change your password immediately and contact our support team.`;
+//       const html = `
+//         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+//           <h2 style="color: #007bff;">Login Notification</h2>
+//           <p>Hello <strong>${user.username}</strong>,</p>
+//           <p>You have successfully logged into your account.</p>
+//           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+//             <p style="margin: 0; color: #6c757d;">Login Details:</p>
+//             <p style="margin: 5px 0;"><strong>Username:</strong> ${user.username}</p>
+//             <p style="margin: 5px 0;"><strong>Email:</strong> ${user.email}</p>
+//             <p style="margin: 5px 0;"><strong>Login Time:</strong> ${currentTime}</p>
+//             <p style="margin: 5px 0;"><strong>Session Duration:</strong> 7 days</p>
+//           </div>
+//           <p>If you did not make this login, please change your password immediately and contact our support team.</p>
+//           <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+//           <p style="color: #999; font-size: 12px;">This is an automated security notification, please do not reply to this email.</p>
+//         </div>
+//       `;
+
+//       await sendEmail(user.email, subject, text, html);
+//     } catch (emailError) {
+//       console.error('Login notification email sending failed:', emailError);
+//       // Don't fail login if email fails
+//     }
+
+//     // Calculate followers and following counts
+//     const followersCount = user.followers ? user.followers.length : 0;
+//     const followingCount = user.following ? user.following.length : 0;
+
+//     // Get posts count
+//     let postsCount = user.postsCount || 0;
+//     if (!user.postsCount || user.postsCount === undefined) {
+//       postsCount = await Post.countDocuments({ user: user._id });
+//       if (postsCount > 0) {
+//         user.postsCount = postsCount;
+//         await user.save();
+//       }
+//     }
+
+//     // Remove password from response
+//     const userResponse = {
+//       _id: user._id,
+//       username: user.username,
+//       email: user.email,
+//       profilePicture: user.profilePicture,
+//       bio: user.bio,
+//       followers: user.followers,
+//       following: user.following,
+//       followersCount: followersCount,
+//       followingCount: followingCount,
+//       postsCount: postsCount,
+//       createdAt: user.createdAt,
+//       updatedAt: user.updatedAt
+//     };
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Login successful",
+//       user: userResponse,
+//       token: token
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Login error:', error);
+//     console.error('Error details:', {
+//       name: error.name,
+//       message: error.message,
+//       code: error.code,
+//       stack: error.stack
+//     });
+    
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error during login",
+//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+//     });
+//   }
+// };
 
 // Forgot Password - Send reset OTP
 export const forgotPassword = async (req, res) => {
