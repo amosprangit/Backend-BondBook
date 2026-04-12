@@ -26,10 +26,12 @@ import {
   getMergeRequests,
   checkMergeRequestStatus,
   getFollowers,
-  getFollowing
+  getFollowing,
+  saveFCMToken
 } from '../controllers/UserController.js';
 import userAuth from '../middleware/userAuth.js';
 import upload from '../middleware/upload.js';
+
 
 const userRouter = express.Router();
 
@@ -72,4 +74,5 @@ userRouter.get('/merge-request-status/:targetUserId', userAuth, checkMergeReques
 userRouter.get('/:userId/followers', userAuth, getFollowers);
 userRouter.get('/:userId/following', userAuth, getFollowing);
 
+userRouter.post('/save-fcm-token', userAuth, saveFCMToken);
 export default userRouter;
