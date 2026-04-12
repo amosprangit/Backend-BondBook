@@ -1033,17 +1033,17 @@ export const togglePostLike = async (req, res) => {
       actionValue === "1" ||
       actionValue === true
     ) {
-      // User wants to like
       if (!isCurrentlyLiked) {
         const updatedPost = await post.likePost(userId);
 
-        // 🔔 SEND PUSH NOTIFICATION
-        // const postOwner = await User.findById(post.user);
-        const postOwner = await User.findById(post.user).select("fcmToken username");
+        const postOwner = await User.findById(post.user).select(
+          "fcmToken username",
+        );
         const likingUser = await User.findById(userId);
 
         if (postOwner?.fcmToken && postOwner._id.toString() !== userId) {
           const username = likingUser?.username || "Someone";
+
           await sendPushNotification(
             postOwner.fcmToken,
             "New Like ❤️",
@@ -1055,11 +1055,19 @@ export const togglePostLike = async (req, res) => {
           );
         }
 
-        res.status(200).json({
+        return res.status(200).json({
           success: true,
           message: "Post liked successfully",
           likes: updatedPost.likes,
           likeCount: updatedPost.likeCount,
+          isLiked: true,
+        });
+      } else {
+        return res.status(200).json({
+          success: true,
+          message: "Post already liked",
+          likes: post.likes,
+          likeCount: post.likeCount,
           isLiked: true,
         });
       }
@@ -1082,7 +1090,7 @@ export const togglePostLike = async (req, res) => {
         });
       } else {
         // Already unliked, return current state
-        res.status(200).json({
+        return res.status(200).json({
           success: true,
           message: "Post already unliked",
           likes: post.likes,
