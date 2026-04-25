@@ -1,11 +1,3 @@
-// import admin from "firebase-admin";
-// import serviceAccount from "./firebaseServiceKey.json" assert { type: "json" };
-
-// admin.initializeApp({
-//   credential: admin.credential.cert(serviceAccount),
-// });
-
-// export default admin;
 import admin from "firebase-admin";
 import fs from "fs";
 import path from "path";
@@ -16,11 +8,13 @@ const __dirname = path.dirname(__filename);
 
 // Load Firebase service key
 const serviceAccount = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "firebaseServiceKey.json"), "utf8")
+  fs.readFileSync(path.join(__dirname, "firebaseServiceKey.json"), "utf8"),
 );
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 export default admin;

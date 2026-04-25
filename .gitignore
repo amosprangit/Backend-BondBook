@@ -148,3 +148,6 @@ uploads/
 .env.local
 .env.development
 .env.production
+
+config/firebaseServiceKey.json
+.env
