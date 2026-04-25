@@ -2433,7 +2433,9 @@ export const getFollowing = async (req, res) => {
 export const saveFCMToken = async (req, res) => {
   try {
     const { fcmToken } = req.body;
-    const userId = req.user.id; // from auth middleware
+    const userId = req.user.userId; // from auth middleware
+    console.log("BODY:", req.body);
+    console.log("USER:", req.user);
 
     await User.findByIdAndUpdate(userId, {
       fcmToken: fcmToken,
