@@ -245,4 +245,3 @@ export const getNotificationCount = async (req, res) => {
     });
   }
 };
-

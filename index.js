@@ -41,7 +41,7 @@ app.use("/api/reminders", reminderRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/mutual-connections", mutualConnectionRouter);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 const dbURI = process.env.MONGODB_URI;
 
 // Database connection with retry logic and better error handling

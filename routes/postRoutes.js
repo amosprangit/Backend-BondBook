@@ -28,7 +28,7 @@ const router = express.Router();
 router.post(
   "/",
   userAuth,
-  upload.any(),
+  upload.single("image"),
   (req, res, next) => {
     console.log("🚀 POST /api/posts route reached");
     next();

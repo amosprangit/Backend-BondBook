@@ -6,6 +6,7 @@ import FollowRequest from "../models/followRequestModel.js";
 import MergeRequest from "../models/mergeRequestModel.js";
 import MutualConnection from "../models/mutualConnectionModel.js";
 import { createNotification } from "./notificationController.js";
+// import { sendNotificationWithType } from "../utils/senderNotification.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import sendEmail from "../config/nodeMailer.js";

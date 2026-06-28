@@ -14,7 +14,6 @@ import {
 } from '../controllers/storyController.js';
 import userAuth from '../middleware/userAuth.js';
 import upload from '../middleware/upload.js';
-
 const router = express.Router();
 
 // All routes require authentication

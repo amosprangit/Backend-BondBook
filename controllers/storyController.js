@@ -1,8 +1,9 @@
-import mongoose from 'mongoose';
-import Story from '../models/storyModel.js';
-import User from '../models/userModel.js';
-import { createNotification } from './notificationController.js';
-import multer from 'multer';
+import mongoose from "mongoose";
+import Story from "../models/storyModel.js";
+import User from "../models/userModel.js";
+import { createNotification } from "./notificationController.js";
+import { sendNotificationWithType } from "../utils/senderNotification.js";
+import multer from "multer";
 // Create a new story
 export const createStory = async (req, res) => {
   try {
@@ -14,15 +15,18 @@ export const createStory = async (req, res) => {
     if (!file) {
       return res.status(400).json({
         success: false,
-        message: "Image or video file is required for story"
+        message: "Image or video file is required for story",
       });
     }
 
     // Check if it's an image or video file
-    if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+    if (
+      !file.mimetype.startsWith("image/") &&
+      !file.mimetype.startsWith("video/")
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Only image and video files are allowed for stories"
+        message: "Only image and video files are allowed for stories",
       });
     }
 
@@ -32,61 +36,62 @@ export const createStory = async (req, res) => {
     // Create story data
     const storyData = {
       user: userId,
-      expiresAt
+      expiresAt,
     };
 
     // Add image or video based on file type
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith("image/")) {
       storyData.image = file.path;
-    } else if (file.mimetype.startsWith('video/')) {
+    } else if (file.mimetype.startsWith("video/")) {
       storyData.video = file.path;
     }
 
     // Create new story
     const newStory = new Story(storyData);
     const savedStory = await newStory.save();
-    
+
     // Get the user who created the story for notification
     const storyUser = await User.findById(userId);
-    
+
     // Notify all followers about the new story
     if (storyUser && savedStory) {
       const followers = storyUser.followers || [];
-      
+
       // Create notifications for all followers (async, don't block response)
-      const notificationPromises = followers.map(followerId => 
+      const notificationPromises = followers.map((followerId) =>
         createNotification(
           followerId,
           userId,
-          'new_story',
+          "new_story",
           `${storyUser.username} created a new story`,
           savedStory._id,
-          'Story'
-        )
+          "Story",
+        ),
       );
-      
+
       // Run notifications in background (don't await - return response immediately)
-      Promise.all(notificationPromises).catch(err => 
-        console.error('Error sending story notifications:', err)
+      Promise.all(notificationPromises).catch((err) =>
+        console.error("Error sending story notifications:", err),
       );
     }
-    
+
     // Populate user details
-    const populatedStory = await Story.findById(savedStory._id)
-      .populate('user', 'username profilePicture');
+    const populatedStory = await Story.findById(savedStory._id).populate(
+      "user",
+      "username profilePicture",
+    );
 
     res.status(201).json({
       success: true,
       message: "Story created successfully",
-      story: populatedStory
+      story: populatedStory,
     });
-
   } catch (error) {
-    console.error('Create story error:', error);
+    console.error("Create story error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while creating story",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -101,19 +106,18 @@ export const getAllStories = async (req, res) => {
     // Get current time to filter out expired stories
     const currentTime = new Date();
 
-    const stories = await Story.find({ 
-      expiresAt: { $gt: currentTime } 
+    const stories = await Story.find({
+      expiresAt: { $gt: currentTime },
     })
-      .populate('user', 'username profilePicture')
+      .populate("user", "username profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalStories = await Story.countDocuments({ 
-      expiresAt: { $gt: currentTime } 
+    const totalStories = await Story.countDocuments({
+      expiresAt: { $gt: currentTime },
     });
     const totalPages = Math.ceil(totalStories / limit);
-
 
     res.status(200).json({
       success: true,
@@ -123,16 +127,15 @@ export const getAllStories = async (req, res) => {
         totalPages,
         totalStories,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
-    console.error('Get all stories error:', error);
+    console.error("Get all stories error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching stories",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -150,25 +153,25 @@ export const getStoriesByUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
 
     // Get current time to filter out expired stories
     const currentTime = new Date();
 
-    const stories = await Story.find({ 
+    const stories = await Story.find({
       user: userId,
-      expiresAt: { $gt: currentTime }
+      expiresAt: { $gt: currentTime },
     })
-      .populate('user', 'username profilePicture')
+      .populate("user", "username profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalStories = await Story.countDocuments({ 
+    const totalStories = await Story.countDocuments({
       user: userId,
-      expiresAt: { $gt: currentTime }
+      expiresAt: { $gt: currentTime },
     });
     const totalPages = Math.ceil(totalStories / limit);
 
@@ -178,23 +181,22 @@ export const getStoriesByUser = async (req, res) => {
       user: {
         _id: user._id,
         username: user.username,
-        profilePicture: user.profilePicture
+        profilePicture: user.profilePicture,
       },
       pagination: {
         currentPage: page,
         totalPages,
         totalStories,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
-    console.error('Get stories by user error:', error);
+    console.error("Get stories by user error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching user stories",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -212,53 +214,51 @@ export const getMyStories = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
 
     // Get current time to filter out expired stories
     const currentTime = new Date();
 
-    const stories = await Story.find({ 
+    const stories = await Story.find({
       user: userId,
-      expiresAt: { $gt: currentTime }
+      expiresAt: { $gt: currentTime },
     })
-      .populate('user', 'username profilePicture')
+      .populate("user", "username profilePicture")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalStories = await Story.countDocuments({ 
+    const totalStories = await Story.countDocuments({
       user: userId,
-      expiresAt: { $gt: currentTime }
+      expiresAt: { $gt: currentTime },
     });
     const totalPages = Math.ceil(totalStories / limit);
 
-
     res.status(200).json({
       success: true,
-      message: 'My stories retrieved successfully',
+      message: "My stories retrieved successfully",
       stories: stories,
       user: {
         _id: user._id,
         username: user.username,
-        profilePicture: user.profilePicture || null
+        profilePicture: user.profilePicture || null,
       },
       pagination: {
         currentPage: page,
         totalPages,
         totalStories,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
-    console.error('Get my stories error:', error);
+    console.error("Get my stories error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching my stories",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -268,13 +268,15 @@ export const getStoryById = async (req, res) => {
   try {
     const { storyId } = req.params;
 
-    const story = await Story.findById(storyId)
-      .populate('user', 'username profilePicture');
+    const story = await Story.findById(storyId).populate(
+      "user",
+      "username profilePicture",
+    );
 
     if (!story) {
       return res.status(404).json({
         success: false,
-        message: "Story not found"
+        message: "Story not found",
       });
     }
 
@@ -282,21 +284,20 @@ export const getStoryById = async (req, res) => {
     if (story.expiresAt < new Date()) {
       return res.status(410).json({
         success: false,
-        message: "Story has expired"
+        message: "Story has expired",
       });
     }
 
     res.status(200).json({
       success: true,
-      story: story
+      story: story,
     });
-
   } catch (error) {
-    console.error('Get story by ID error:', error);
+    console.error("Get story by ID error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching story",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -312,7 +313,7 @@ export const updateStory = async (req, res) => {
     if (!story) {
       return res.status(404).json({
         success: false,
-        message: "Story not found"
+        message: "Story not found",
       });
     }
 
@@ -320,7 +321,7 @@ export const updateStory = async (req, res) => {
     if (story.expiresAt < new Date()) {
       return res.status(410).json({
         success: false,
-        message: "Cannot update expired story"
+        message: "Cannot update expired story",
       });
     }
 
@@ -328,7 +329,7 @@ export const updateStory = async (req, res) => {
     if (story.user.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "You can only update your own stories"
+        message: "You can only update your own stories",
       });
     }
 
@@ -338,23 +339,24 @@ export const updateStory = async (req, res) => {
     }
 
     const updatedStory = await story.save();
-    
+
     // Populate user details
-    const populatedStory = await Story.findById(updatedStory._id)
-      .populate('user', 'username profilePicture');
+    const populatedStory = await Story.findById(updatedStory._id).populate(
+      "user",
+      "username profilePicture",
+    );
 
     res.status(200).json({
       success: true,
       message: "Story updated successfully",
-      story: populatedStory
+      story: populatedStory,
     });
-
   } catch (error) {
-    console.error('Update story error:', error);
+    console.error("Update story error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while updating story",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -369,7 +371,7 @@ export const deleteStory = async (req, res) => {
     if (!story) {
       return res.status(404).json({
         success: false,
-        message: "Story not found"
+        message: "Story not found",
       });
     }
 
@@ -377,7 +379,7 @@ export const deleteStory = async (req, res) => {
     if (story.user.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: "You can only delete your own stories"
+        message: "You can only delete your own stories",
       });
     }
 
@@ -385,15 +387,14 @@ export const deleteStory = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Story deleted successfully"
+      message: "Story deleted successfully",
     });
-
   } catch (error) {
-    console.error('Delete story error:', error);
+    console.error("Delete story error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while deleting story",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -407,22 +408,22 @@ export const getStoryFeed = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Get user's following list
-    const user = await User.findById(userId).select('following');
+    const user = await User.findById(userId).select("following");
     const followingIds = user.following;
-    
+
     // Only show stories from followed users (exclude own stories for Instagram-like behavior)
     if (followingIds.length === 0) {
       return res.status(200).json({
         success: true,
-        message: 'No stories from followed users',
+        message: "No stories from followed users",
         stories: [],
         pagination: {
           currentPage: page,
           totalPages: 0,
           totalStories: 0,
           hasNextPage: false,
-          hasPrevPage: false
-        }
+          hasPrevPage: false,
+        },
       });
     }
 
@@ -434,35 +435,35 @@ export const getStoryFeed = async (req, res) => {
       {
         $match: {
           user: { $in: followingIds },
-          expiresAt: { $gt: currentTime }
-        }
+          expiresAt: { $gt: currentTime },
+        },
       },
       { $sort: { createdAt: -1 } },
       {
         $lookup: {
-          from: 'users',
-          localField: 'user',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "userInfo",
+        },
       },
-      { $unwind: '$userInfo' },
+      { $unwind: "$userInfo" },
       {
         $group: {
-          _id: '$user',
-          user: { $first: '$userInfo' },
-          latestCreatedAt: { $max: '$createdAt' },
+          _id: "$user",
+          user: { $first: "$userInfo" },
+          latestCreatedAt: { $max: "$createdAt" },
           stories: {
             $push: {
-              _id: '$_id',
-              image: '$image',
-              video: '$video',
-              createdAt: '$createdAt',
-              expiresAt: '$expiresAt'
-            }
+              _id: "$_id",
+              image: "$image",
+              video: "$video",
+              createdAt: "$createdAt",
+              expiresAt: "$expiresAt",
+            },
           },
-          storyCount: { $sum: 1 }
-        }
+          storyCount: { $sum: 1 },
+        },
       },
       { $sort: { latestCreatedAt: -1 } },
       { $skip: skip },
@@ -470,11 +471,15 @@ export const getStoryFeed = async (req, res) => {
       {
         $project: {
           _id: 1,
-          user: { _id: '$user._id', username: '$user.username', profilePicture: '$user.profilePicture' },
+          user: {
+            _id: "$user._id",
+            username: "$user.username",
+            profilePicture: "$user.profilePicture",
+          },
           stories: 1,
-          storyCount: 1
-        }
-      }
+          storyCount: 1,
+        },
+      },
     ]);
 
     // Compute total groups for pagination
@@ -482,24 +487,24 @@ export const getStoryFeed = async (req, res) => {
       {
         $match: {
           user: { $in: followingIds },
-          expiresAt: { $gt: currentTime }
-        }
+          expiresAt: { $gt: currentTime },
+        },
       },
-      { $group: { _id: '$user' } },
-      { $count: 'total' }
+      { $group: { _id: "$user" } },
+      { $count: "total" },
     ]);
     const totalGroups = totalGroupsAgg.length > 0 ? totalGroupsAgg[0].total : 0;
     const totalPages = Math.ceil(totalGroups / limit);
 
     // Add URLs for stories' media and user's profilePicture
-    const result = grouped.map(group => {
+    const result = grouped.map((group) => {
       const userObj = {
         _id: group.user._id,
         username: group.user.username,
-        profilePicture: group.user.profilePicture || null
+        profilePicture: group.user.profilePicture || null,
       };
 
-      const storiesWithUrls = group.stories.map(s => {
+      const storiesWithUrls = group.stories.map((s) => {
         const entry = { ...s };
         return entry;
       });
@@ -508,29 +513,28 @@ export const getStoryFeed = async (req, res) => {
         _id: group._id,
         user: userObj,
         stories: storiesWithUrls,
-        storyCount: group.storyCount
+        storyCount: group.storyCount,
       };
     });
 
     res.status(200).json({
       success: true,
-      message: 'Story feed retrieved successfully',
+      message: "Story feed retrieved successfully",
       stories: result,
       pagination: {
         currentPage: page,
         totalPages,
         totalUsers: totalGroups,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
-    console.error('Get story feed error:', error);
+    console.error("Get story feed error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching story feed",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -539,18 +543,20 @@ export const getStoryFeed = async (req, res) => {
 const autoCleanupExpiredStories = async () => {
   try {
     const currentTime = new Date();
-    
+
     const result = await Story.deleteMany({
-      expiresAt: { $lt: currentTime }
+      expiresAt: { $lt: currentTime },
     });
 
     if (result.deletedCount > 0) {
-      console.log(`✅ Auto-cleaned ${result.deletedCount} expired story/stories`);
+      console.log(
+        `✅ Auto-cleaned ${result.deletedCount} expired story/stories`,
+      );
     }
 
     return result.deletedCount;
   } catch (error) {
-    console.error('❌ Auto-cleanup expired stories error:', error);
+    console.error("❌ Auto-cleanup expired stories error:", error);
     return 0;
   }
 };
@@ -563,15 +569,14 @@ export const cleanupExpiredStories = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Cleaned up ${deletedCount} expired stories`,
-      deletedCount
+      deletedCount,
     });
-
   } catch (error) {
-    console.error('Cleanup expired stories error:', error);
+    console.error("Cleanup expired stories error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while cleaning up expired stories",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -594,8 +599,10 @@ export const startAutoCleanup = (intervalMinutes = 60) => {
     autoCleanupExpiredStories();
   }, intervalMs);
 
-  console.log(`🔄 Auto-cleanup started: Checking for expired stories every ${intervalMinutes} minutes`);
-  
+  console.log(
+    `🔄 Auto-cleanup started: Checking for expired stories every ${intervalMinutes} minutes`,
+  );
+
   return cleanupInterval;
 };
 
@@ -604,7 +611,7 @@ export const stopAutoCleanup = () => {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
-    console.log('🛑 Auto-cleanup stopped');
+    console.log("🛑 Auto-cleanup stopped");
   }
 };
 
@@ -619,7 +626,7 @@ export const getStoryStats = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
 
@@ -628,19 +635,19 @@ export const getStoryStats = async (req, res) => {
     // Get active stories count
     const activeStoriesCount = await Story.countDocuments({
       user: userId,
-      expiresAt: { $gt: currentTime }
+      expiresAt: { $gt: currentTime },
     });
 
     // Get total stories count (including expired)
     const totalStoriesCount = await Story.countDocuments({
-      user: userId
+      user: userId,
     });
 
     // Get stories created in last 24 hours
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentStoriesCount = await Story.countDocuments({
       user: userId,
-      createdAt: { $gt: last24Hours }
+      createdAt: { $gt: last24Hours },
     });
 
     res.status(200).json({
@@ -649,21 +656,20 @@ export const getStoryStats = async (req, res) => {
         activeStories: activeStoriesCount,
         totalStories: totalStoriesCount,
         recentStories: recentStoriesCount,
-        expiredStories: totalStoriesCount - activeStoriesCount
+        expiredStories: totalStoriesCount - activeStoriesCount,
       },
       user: {
         _id: user._id,
         username: user.username,
-        profilePicture: user.profilePicture
-      }
+        profilePicture: user.profilePicture,
+      },
     });
-
   } catch (error) {
-    console.error('Get story stats error:', error);
+    console.error("Get story stats error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching story statistics",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
@@ -677,21 +683,23 @@ export const getStoriesGroupedByUser = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Get user's following list
-    const user = await User.findById(userId).select('following');
-    const followingIds = user.following.map(id => new mongoose.Types.ObjectId(id));
-    
+    const user = await User.findById(userId).select("following");
+    const followingIds = user.following.map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+
     if (followingIds.length === 0) {
       return res.status(200).json({
         success: true,
-        message: 'No stories from followed users',
+        message: "No stories from followed users",
         storiesByUser: [],
         pagination: {
           currentPage: page,
           totalPages: 0,
           totalUsers: 0,
           hasNextPage: false,
-          hasPrevPage: false
-        }
+          hasPrevPage: false,
+        },
       });
     }
 
@@ -702,87 +710,88 @@ export const getStoriesGroupedByUser = async (req, res) => {
       {
         $match: {
           user: { $in: followingIds },
-          expiresAt: { $gt: currentTime }
-        }
+          expiresAt: { $gt: currentTime },
+        },
       },
       {
         $lookup: {
-          from: 'users',
-          localField: 'user',
-          foreignField: '_id',
-          as: 'userInfo'
-        }
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "userInfo",
+        },
       },
       {
-        $unwind: '$userInfo'
+        $unwind: "$userInfo",
       },
       {
         $group: {
-          _id: '$user',
-          user: { $first: '$userInfo' },
+          _id: "$user",
+          user: { $first: "$userInfo" },
           stories: {
             $push: {
-              _id: '$_id',
-              image: '$image',
-              createdAt: '$createdAt',
-              expiresAt: '$expiresAt'
-            }
+              _id: "$_id",
+              image: "$image",
+              createdAt: "$createdAt",
+              expiresAt: "$expiresAt",
+            },
           },
-          storyCount: { $sum: 1 }
-        }
+          storyCount: { $sum: 1 },
+        },
       },
       {
         $project: {
           _id: 1,
           user: {
-            _id: '$user._id',
-            username: '$user.username',
-            profilePicture: '$user.profilePicture'
+            _id: "$user._id",
+            username: "$user.username",
+            profilePicture: "$user.profilePicture",
           },
           stories: 1,
-          storyCount: 1
-        }
+          storyCount: 1,
+        },
       },
       {
-        $sort: { 'stories.createdAt': -1 }
+        $sort: { "stories.createdAt": -1 },
       },
       {
-        $skip: skip
+        $skip: skip,
       },
       {
-        $limit: limit
-      }
+        $limit: limit,
+      },
     ]);
 
     const totalUsers = await Story.aggregate([
       {
         $match: {
           user: { $in: followingIds },
-          expiresAt: { $gt: currentTime }
-        }
+          expiresAt: { $gt: currentTime },
+        },
       },
       {
         $group: {
-          _id: '$user'
-        }
+          _id: "$user",
+        },
       },
       {
-        $count: 'totalUsers'
-      }
+        $count: "totalUsers",
+      },
     ]);
 
-    const totalUsersCount = totalUsers.length > 0 ? totalUsers[0].totalUsers : 0;
+    const totalUsersCount =
+      totalUsers.length > 0 ? totalUsers[0].totalUsers : 0;
     const totalPages = Math.ceil(totalUsersCount / limit);
 
     // Format stories and user profile pictures
-    const storiesByUserWithUrls = storiesByUser.map(group => {
+    const storiesByUserWithUrls = storiesByUser.map((group) => {
       const userObj = {
         _id: group.user._id,
         username: group.user.username,
-        profilePicture: group.user.profilePicture || null
+        profilePicture: group.user.profilePicture || null,
       };
 
-      const storiesWithUrls = group.stories.map(story => {
+      const storiesWithUrls = group.stories.map((story) => {
         return { ...story };
       });
 
@@ -790,29 +799,79 @@ export const getStoriesGroupedByUser = async (req, res) => {
         _id: group._id,
         user: userObj,
         stories: storiesWithUrls,
-        storyCount: group.storyCount
+        storyCount: group.storyCount,
       };
     });
 
     res.status(200).json({
       success: true,
-      message: 'Stories grouped by user retrieved successfully',
+      message: "Stories grouped by user retrieved successfully",
       storiesByUser: storiesByUserWithUrls,
       pagination: {
         currentPage: page,
         totalPages,
         totalUsers: totalUsersCount,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
-    console.error('Get stories grouped by user error:', error);
+    console.error("Get stories grouped by user error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching grouped stories",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
+  }
+};
+
+// controllers/storyController.js
+
+export const likeStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const userId = req.user.userId;
+
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({ error: "Story not found" });
+    }
+
+    // Check if already liked
+    const isLiked = story.likes.includes(userId);
+
+    if (isLiked) {
+      story.likes = story.likes.filter((id) => id.toString() !== userId);
+      await story.save();
+
+      return res.json({
+        success: true,
+        isLiked: false,
+        likes: story.likes.length,
+      });
+    } else {
+      story.likes.push(userId);
+      await story.save();
+
+      // ✅ SEND STORY LIKE NOTIFICATION
+      // Only if the liker is not the story owner
+      if (story.user.toString() !== userId) {
+        await sendNotificationWithType(
+          story.user, // recipient (story owner)
+          "story_like",
+          { storyId: story._id.toString() },
+          userId, // sender (who liked)
+        );
+      }
+
+      return res.json({
+        success: true,
+        isLiked: true,
+        likes: story.likes.length,
+      });
+    }
+  } catch (error) {
+    console.error("❌ Story like error:", error);
+    res.status(500).json({ error: error.message });
   }
 };

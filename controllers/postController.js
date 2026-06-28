@@ -1205,7 +1205,7 @@ export const getPostComments = async (req, res) => {
   }
 };
 
-// Add comment to a post
+// Add comment to a post (WITH NOTIFICATIONS)
 export const addPostComment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1221,11 +1221,85 @@ export const addPostComment = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    await post.addComment(userId, comment.trim());
+    // Add comment using the model method
+    const updatedPost = await post.addComment(userId, comment.trim());
+
+    // Get the newly added comment (last one in the array)
+    const newComment = updatedPost.comments[updatedPost.comments.length - 1];
+
+    // ✅ GET USER INFO FOR NOTIFICATIONS
+    const commenter = await User.findById(userId);
+    const postOwner = await User.findById(post.user);
+
+    // ✅ 1. SEND COMMENT NOTIFICATION TO POST OWNER
+    // Only if commenter is not the post owner
+    if (post.user.toString() !== userId && postOwner?.fcmToken) {
+      const username = commenter?.username || "Someone";
+      const commentPreview =
+        comment.trim().substring(0, 50) +
+        (comment.trim().length > 50 ? "..." : "");
+
+      await sendPushNotification(
+        postOwner.fcmToken,
+        "💬 New Comment",
+        `${username}: "${commentPreview}"`,
+        {
+          type: "comment",
+          postId: post._id.toString(),
+          commentId: newComment?._id?.toString() || "",
+          username: username,
+        },
+      );
+      console.log(`✅ Comment notification sent to ${postOwner.username}`);
+    }
+
+    // ✅ 2. CHECK FOR MENTIONS (@username) AND SEND NOTIFICATIONS
+    const mentionRegex = /@(\w+)/g;
+    const mentions = comment.match(mentionRegex);
+
+    if (mentions) {
+      for (const mention of mentions) {
+        const username = mention.substring(1); // Remove @
+        const mentionedUser = await User.findOne({ username });
+
+        // Don't notify if:
+        // - User doesn't exist
+        // - Mention is self
+        // - Mention is post owner (already got comment notification)
+        // - User has no FCM token
+        if (
+          mentionedUser &&
+          mentionedUser._id.toString() !== userId &&
+          mentionedUser._id.toString() !== post.user.toString() &&
+          mentionedUser.fcmToken
+        ) {
+          const commentPreview =
+            comment.trim().substring(0, 50) +
+            (comment.trim().length > 50 ? "..." : "");
+
+          await sendPushNotification(
+            mentionedUser.fcmToken,
+            "📌 You were mentioned!",
+            `${commenter?.username || "Someone"} mentioned you: "${commentPreview}"`,
+            {
+              type: "mention",
+              postId: post._id.toString(),
+              commentId: newComment?._id?.toString() || "",
+              mentionedBy: userId,
+              username: commenter?.username || "Someone",
+            },
+          );
+          console.log(
+            `✅ Mention notification sent to ${mentionedUser.username}`,
+          );
+        }
+      }
+    }
 
     res.status(201).json({
       message: "Comment added successfully",
-      commentCount: post.commentCount,
+      commentCount: updatedPost.commentCount,
+      comment: newComment,
     });
   } catch (error) {
     console.error("Error adding comment:", error);
