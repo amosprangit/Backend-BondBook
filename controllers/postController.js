@@ -1206,51 +1206,103 @@ export const getPostComments = async (req, res) => {
 };
 
 // Add comment to a post (WITH NOTIFICATIONS)
+// Add comment to a post (WITH NOTIFICATIONS) - FIXED
 export const addPostComment = async (req, res) => {
   try {
     const { id } = req.params;
     const { comment } = req.body;
     const userId = req.user.userId;
 
+    console.log("========================================");
+    console.log("📝 addPostComment CALLED");
+    console.log("📝 userId:", userId);
+    console.log("📝 postId:", id);
+    console.log("📝 comment:", comment);
+    console.log("========================================");
+
     if (!comment || comment.trim().length === 0) {
+      console.log("❌ Comment is empty");
       return res.status(400).json({ message: "Comment cannot be empty" });
     }
 
     const post = await Post.findById(id);
     if (!post) {
+      console.log("❌ Post not found");
       return res.status(404).json({ message: "Post not found" });
     }
+
+    console.log("📝 Post found:");
+    console.log("  - Post ID:", post._id);
+    console.log("  - Post Owner ID:", post.user);
+    console.log("  - Commenter ID:", userId);
 
     // Add comment using the model method
     const updatedPost = await post.addComment(userId, comment.trim());
 
     // Get the newly added comment (last one in the array)
     const newComment = updatedPost.comments[updatedPost.comments.length - 1];
+    console.log("✅ Comment added successfully");
+    console.log("  - Comment ID:", newComment._id);
 
     // ✅ GET USER INFO FOR NOTIFICATIONS
     const commenter = await User.findById(userId);
     const postOwner = await User.findById(post.user);
 
+    console.log("📝 User Info:");
+    console.log("  - Commenter:", commenter?.username);
+    console.log("  - Post Owner:", postOwner?.username);
+    console.log(
+      "  - Post Owner FCM Token:",
+      postOwner?.fcmToken ? "✅ EXISTS" : "❌ NULL",
+    );
+
     // ✅ 1. SEND COMMENT NOTIFICATION TO POST OWNER
     // Only if commenter is not the post owner
-    if (post.user.toString() !== userId && postOwner?.fcmToken) {
+    const isNotSelf = post.user.toString() !== userId;
+    console.log("📝 Conditions:");
+    console.log("  - isNotSelf (commenter != post owner):", isNotSelf);
+    console.log("  - postOwner exists:", !!postOwner);
+    console.log("  - postOwner.fcmToken exists:", !!postOwner?.fcmToken);
+
+    if (isNotSelf && postOwner?.fcmToken) {
       const username = commenter?.username || "Someone";
       const commentPreview =
         comment.trim().substring(0, 50) +
         (comment.trim().length > 50 ? "..." : "");
 
-      await sendPushNotification(
-        postOwner.fcmToken,
-        "💬 New Comment",
-        `${username}: "${commentPreview}"`,
-        {
-          type: "comment",
-          postId: post._id.toString(),
-          commentId: newComment?._id?.toString() || "",
-          username: username,
-        },
+      console.log("📤 SENDING COMMENT NOTIFICATION TO POST OWNER...");
+      console.log("  - Token:", postOwner.fcmToken.substring(0, 30) + "...");
+      console.log("  - Title: 💬 New Comment");
+      console.log("  - Body:", `${username}: "${commentPreview}"`);
+
+      try {
+        const result = await sendPushNotification(
+          postOwner.fcmToken,
+          "💬 New Comment",
+          `${username}: "${commentPreview}"`,
+          {
+            type: "comment",
+            postId: post._id.toString(),
+            commentId: newComment?._id?.toString() || "",
+            username: username,
+            commentText: comment.trim(),
+          },
+        );
+        console.log("📬 Notification send result:", result);
+        console.log(`✅ Comment notification sent to ${postOwner.username}`);
+      } catch (notifError) {
+        console.error("❌ Failed to send comment notification:", notifError);
+      }
+    } else {
+      console.log("⚠️ SKIPPING comment notification to post owner");
+      console.log("  - isNotSelf:", isNotSelf);
+      console.log("  - hasFcmToken:", !!postOwner?.fcmToken);
+      console.log(
+        "  - Reason:",
+        !isNotSelf
+          ? "Commenter is post owner (self)"
+          : "Post owner has no FCM token",
       );
-      console.log(`✅ Comment notification sent to ${postOwner.username}`);
     }
 
     // ✅ 2. CHECK FOR MENTIONS (@username) AND SEND NOTIFICATIONS
@@ -1258,9 +1310,16 @@ export const addPostComment = async (req, res) => {
     const mentions = comment.match(mentionRegex);
 
     if (mentions) {
+      console.log(`📝 Found ${mentions.length} mention(s):`, mentions);
       for (const mention of mentions) {
         const username = mention.substring(1); // Remove @
+        console.log(`  - Checking mention: @${username}`);
         const mentionedUser = await User.findOne({ username });
+
+        console.log(
+          `  - User found for @${username}:`,
+          mentionedUser?.username || "NOT FOUND",
+        );
 
         // Don't notify if:
         // - User doesn't exist
@@ -1277,24 +1336,52 @@ export const addPostComment = async (req, res) => {
             comment.trim().substring(0, 50) +
             (comment.trim().length > 50 ? "..." : "");
 
-          await sendPushNotification(
-            mentionedUser.fcmToken,
-            "📌 You were mentioned!",
-            `${commenter?.username || "Someone"} mentioned you: "${commentPreview}"`,
-            {
-              type: "mention",
-              postId: post._id.toString(),
-              commentId: newComment?._id?.toString() || "",
-              mentionedBy: userId,
-              username: commenter?.username || "Someone",
-            },
-          );
+          console.log(`📤 SENDING MENTION NOTIFICATION to @${username}...`);
           console.log(
-            `✅ Mention notification sent to ${mentionedUser.username}`,
+            `  - Token: ${mentionedUser.fcmToken.substring(0, 30)}...`,
           );
+
+          try {
+            await sendPushNotification(
+              mentionedUser.fcmToken,
+              "📌 You were mentioned!",
+              `${commenter?.username || "Someone"} mentioned you: "${commentPreview}"`,
+              {
+                type: "mention",
+                postId: post._id.toString(),
+                commentId: newComment?._id?.toString() || "",
+                mentionedBy: userId,
+                username: commenter?.username || "Someone",
+                commentText: comment.trim(),
+              },
+            );
+            console.log(
+              `✅ Mention notification sent to ${mentionedUser.username}`,
+            );
+          } catch (notifError) {
+            console.error(
+              `❌ Failed to send mention notification to @${username}:`,
+              notifError,
+            );
+          }
+        } else {
+          console.log(`  ⚠️ Skipping mention to @${username}`);
+          if (!mentionedUser) console.log(`    - User not found`);
+          if (mentionedUser?._id.toString() === userId)
+            console.log(`    - Mention is self`);
+          if (mentionedUser?._id.toString() === post.user.toString())
+            console.log(`    - Mention is post owner`);
+          if (!mentionedUser?.fcmToken)
+            console.log(`    - User has no FCM token`);
         }
       }
+    } else {
+      console.log("📝 No mentions found in comment");
     }
+
+    console.log("========================================");
+    console.log("✅ addPostComment COMPLETED");
+    console.log("========================================");
 
     res.status(201).json({
       message: "Comment added successfully",
@@ -1302,7 +1389,7 @@ export const addPostComment = async (req, res) => {
       comment: newComment,
     });
   } catch (error) {
-    console.error("Error adding comment:", error);
+    console.error("❌ Error adding comment:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

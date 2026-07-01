@@ -1,6 +1,6 @@
 // utils/senderNotification.js
 import admin from "../config/firebaseAdmin.js";
-
+import User from "../models/userModel.js";
 export const sendPushNotification = async (token, title, body, data = {}) => {
   try {
     if (!token) {
