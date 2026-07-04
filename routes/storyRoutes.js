@@ -10,7 +10,7 @@ import {
   cleanupExpiredStories,
   getStoryStats,
   getStoriesGroupedByUser,
-  getMyStories
+  getMyStories, likeStory, unlikeStory
 } from '../controllers/storyController.js';
 import userAuth from '../middleware/userAuth.js';
 import upload from '../middleware/upload.js';
@@ -30,7 +30,8 @@ router.get('/user/:userId', getStoriesByUser);    // Get stories by specific use
 router.get('/:storyId', getStoryById);            // Get single story by ID
 router.put('/:storyId', updateStory);             // Update story
 router.delete('/:storyId', deleteStory);          // Delete story
-
+router.post('/:storyId/like', userAuth, likeStory);
+router.delete('/:storyId/like', userAuth, unlikeStory);
 // Utility routes
 router.delete('/cleanup/expired', cleanupExpiredStories); // Clean up expired stories
 

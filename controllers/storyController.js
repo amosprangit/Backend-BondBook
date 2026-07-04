@@ -875,3 +875,51 @@ export const likeStory = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const unlikeStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const userId = req.user.userId;
+
+    console.log("📝 unlikeStory CALLED");
+    console.log("📝 userId:", userId);
+    console.log("📝 storyId:", storyId);
+
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({
+        success: false,
+        message: "Story not found",
+      });
+    }
+
+    // Check if not liked
+    if (!story.likes || !story.likes.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "You have not liked this story",
+      });
+    }
+
+    // Remove like
+    story.likes = story.likes.filter(
+      (id) => id.toString() !== userId.toString(),
+    );
+    await story.save();
+
+    console.log("✅ Story unliked successfully");
+
+    res.status(200).json({
+      success: true,
+      message: "Story unliked successfully",
+      likes: story.likes.length,
+      isLiked: false,
+    });
+  } catch (error) {
+    console.error("❌ Story unlike error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
