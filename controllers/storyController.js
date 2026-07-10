@@ -827,63 +827,116 @@ export const getStoriesGroupedByUser = async (req, res) => {
 
 // controllers/storyController.js
 
+// ✅ FIXED: likeStory function
 export const likeStory = async (req, res) => {
   try {
     const { storyId } = req.params;
     const userId = req.user.userId;
 
-    const story = await Story.findById(storyId);
-    if (!story) {
-      return res.status(404).json({ error: "Story not found" });
+    // Validate inputs
+    if (!storyId) {
+      return res.status(400).json({
+        success: false,
+        error: "Story ID is required",
+      });
     }
 
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "User not authenticated",
+      });
+    }
+
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({
+        success: false,
+        error: "Story not found",
+      });
+    }
+
+    // ✅ Since we have default: [] in schema, likes will always exist
+    // But keep this safety check just in case
+    if (!story.likes) {
+      story.likes = [];
+    }
+
+    // Convert userId to string for comparison
+    const userIdStr = userId.toString();
+
     // Check if already liked
-    const isLiked = story.likes.includes(userId);
+    const isLiked = story.likes.some((id) => id.toString() === userIdStr);
 
     if (isLiked) {
-      story.likes = story.likes.filter((id) => id.toString() !== userId);
+      // Unlike: Remove user from likes
+      story.likes = story.likes.filter((id) => id.toString() !== userIdStr);
       await story.save();
 
-      return res.json({
+      return res.status(200).json({
         success: true,
         isLiked: false,
         likes: story.likes.length,
+        message: "Story unliked successfully",
       });
     } else {
+      // Like: Add user to likes
       story.likes.push(userId);
       await story.save();
 
-      // ✅ SEND STORY LIKE NOTIFICATION
-      // Only if the liker is not the story owner
-      if (story.user.toString() !== userId) {
-        await sendNotificationWithType(
-          story.user, // recipient (story owner)
-          "story_like",
-          { storyId: story._id.toString() },
-          userId, // sender (who liked)
-        );
+      // Send story like notification (if not own story)
+      if (story.user.toString() !== userIdStr) {
+        try {
+          await sendNotificationWithType(
+            story.user, // recipient (story owner)
+            "story_like",
+            { storyId: story._id.toString() },
+            userId, // sender (who liked)
+          );
+        } catch (notificationError) {
+          console.error(
+            "⚠️ Failed to send story like notification:",
+            notificationError,
+          );
+          // Don't fail the request if notification fails
+        }
       }
 
-      return res.json({
+      return res.status(200).json({
         success: true,
         isLiked: true,
         likes: story.likes.length,
+        message: "Story liked successfully",
       });
     }
   } catch (error) {
     console.error("❌ Story like error:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to like story",
+    });
   }
 };
 
+// ✅ FIXED: unlikeStory function
 export const unlikeStory = async (req, res) => {
   try {
     const { storyId } = req.params;
     const userId = req.user.userId;
 
-    console.log("📝 unlikeStory CALLED");
-    console.log("📝 userId:", userId);
-    console.log("📝 storyId:", storyId);
+    if (!storyId) {
+      return res.status(400).json({
+        success: false,
+        message: "Story ID is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
 
     const story = await Story.findById(storyId);
     if (!story) {
@@ -893,8 +946,18 @@ export const unlikeStory = async (req, res) => {
       });
     }
 
+    // Safety check
+    if (!story.likes || story.likes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No likes on this story",
+      });
+    }
+
+    const userIdStr = userId.toString();
+
     // Check if not liked
-    if (!story.likes || !story.likes.includes(userId)) {
+    if (!story.likes.some((id) => id.toString() === userIdStr)) {
       return res.status(400).json({
         success: false,
         message: "You have not liked this story",
@@ -902,12 +965,8 @@ export const unlikeStory = async (req, res) => {
     }
 
     // Remove like
-    story.likes = story.likes.filter(
-      (id) => id.toString() !== userId.toString(),
-    );
+    story.likes = story.likes.filter((id) => id.toString() !== userIdStr);
     await story.save();
-
-    console.log("✅ Story unliked successfully");
 
     res.status(200).json({
       success: true,
@@ -919,7 +978,7 @@ export const unlikeStory = async (req, res) => {
     console.error("❌ Story unlike error:", error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message || "Failed to unlike story",
     });
   }
 };
