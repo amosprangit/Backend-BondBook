@@ -24,9 +24,10 @@ import {
   sendMessage,
   getMessages,
   getUnreadMessageCount,
-  markMessagesAsRead
+  markMessagesAsRead,
+  getTotalUnreadCount,
+  getUnreadMessagesForAllConnections
 } from '../controllers/messageController.js';
-
 const router = express.Router();
 
 // Mutual Connection Routes
@@ -61,6 +62,7 @@ router.post('/:mutualConnectionId/messages', userAuth, sendMessage);
 router.get('/:mutualConnectionId/messages', userAuth, getMessages);
 router.get('/:mutualConnectionId/messages/unread-count', userAuth, getUnreadMessageCount);
 router.put('/:mutualConnectionId/messages/read', userAuth, markMessagesAsRead);
-
+router.get('/messages/unread/total', userAuth, getTotalUnreadCount);
+router.get('/messages/unread/all', userAuth, getUnreadMessagesForAllConnections );
 export default router;
 

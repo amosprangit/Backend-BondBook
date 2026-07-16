@@ -1,11 +1,19 @@
-import Notification from '../models/notificationModel.js';
-import User from '../models/userModel.js';
+import Notification from "../models/notificationModel.js";
+import User from "../models/userModel.js";
+import { sendNotificationWithType } from "../utils/senderNotification.js";
 
 // Helper function to create a notification
-export const createNotification = async (userId, fromUserId, type, message, relatedId = null, relatedModel = null) => {
+export const createNotification = async (
+  userId,
+  fromUserId,
+  type,
+  message,
+  relatedId = null,
+  relatedModel = null,
+) => {
   try {
     // Don't create notification if user is trying to notify themselves
-    if (userId.toString() === fromUserId.toString()) {
+    if (userId.toString() === fromUserId?.toString()) {
       return null;
     }
 
@@ -15,16 +23,75 @@ export const createNotification = async (userId, fromUserId, type, message, rela
       type,
       message,
       relatedId,
-      relatedModel
+      relatedModel,
     });
 
     // Populate fromUser before returning (if needed for real-time)
-    await notification.populate('fromUser', 'username profilePicture');
-    
+    await notification.populate("fromUser", "username profilePicture");
+
     return notification;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error("Error creating notification:", error);
     return null; // Don't throw, just log the error
+  }
+};
+
+// ✅ NEW: Create notification and send push notification
+export const createNotificationWithPush = async (
+  recipientId,
+  senderId,
+  type,
+  message,
+  relatedId = null,
+  relatedModel = null,
+  additionalData = {},
+) => {
+  try {
+    // Don't create notification if user is trying to notify themselves
+    if (recipientId.toString() === senderId?.toString()) {
+      return null;
+    }
+
+    // Get sender details for push notification
+    const sender = senderId ? await User.findById(senderId) : null;
+    const senderName = sender?.username || "Someone";
+
+    // Create notification in database
+    const notification = await createNotification(
+      recipientId,
+      senderId,
+      type,
+      message,
+      relatedId,
+      relatedModel,
+    );
+
+    // Send push notification
+    try {
+      await sendNotificationWithType(
+        recipientId,
+        type,
+        {
+          ...additionalData,
+          notificationId: notification?._id,
+          relatedId,
+          relatedModel,
+          senderId,
+        },
+        senderId,
+      );
+    } catch (pushError) {
+      console.error(
+        "❌ Push notification failed but notification was saved:",
+        pushError,
+      );
+      // Don't throw - notification is already saved
+    }
+
+    return notification;
+  } catch (error) {
+    console.error("Error creating notification with push:", error);
+    return null;
   }
 };
 
@@ -33,24 +100,24 @@ export const getNotifications = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { limit = 50, page = 1 } = req.query;
-    
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Get all notifications, including those with null fromUser (reminder notifications)
     const notifications = await Notification.find({ user: userId })
       .populate({
-        path: 'fromUser',
-        select: 'username profilePicture',
-        options: { strictPopulate: false } // Don't fail if fromUser is null
+        path: "fromUser",
+        select: "username profilePicture",
+        options: { strictPopulate: false }, // Don't fail if fromUser is null
       })
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
 
     // Get unread count
-    const unreadCount = await Notification.countDocuments({ 
-      user: userId, 
-      isRead: false 
+    const unreadCount = await Notification.countDocuments({
+      user: userId,
+      isRead: false,
     });
 
     // Get total count
@@ -63,13 +130,13 @@ export const getNotifications = async (req, res) => {
       totalCount,
       page: parseInt(page),
       limit: parseInt(limit),
-      hasMore: totalCount > skip + notifications.length
+      hasMore: totalCount > skip + notifications.length,
     });
   } catch (error) {
-    console.error('Get notifications error:', error);
+    console.error("Get notifications error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -81,33 +148,33 @@ export const getUnreadNotifications = async (req, res) => {
     const { limit = 20 } = req.query;
 
     // Get unread notifications, including those with null fromUser (reminder notifications)
-    const notifications = await Notification.find({ 
-      user: userId, 
-      isRead: false 
+    const notifications = await Notification.find({
+      user: userId,
+      isRead: false,
     })
       .populate({
-        path: 'fromUser',
-        select: 'username profilePicture',
-        options: { strictPopulate: false } // Don't fail if fromUser is null
+        path: "fromUser",
+        select: "username profilePicture",
+        options: { strictPopulate: false }, // Don't fail if fromUser is null
       })
       .sort({ createdAt: -1 })
       .limit(parseInt(limit));
 
-    const unreadCount = await Notification.countDocuments({ 
-      user: userId, 
-      isRead: false 
+    const unreadCount = await Notification.countDocuments({
+      user: userId,
+      isRead: false,
     });
 
     return res.status(200).json({
       success: true,
       notifications,
-      unreadCount
+      unreadCount,
     });
   } catch (error) {
-    console.error('Get unread notifications error:', error);
+    console.error("Get unread notifications error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -120,29 +187,30 @@ export const markAsRead = async (req, res) => {
 
     const notification = await Notification.findOne({
       _id: notificationId,
-      user: userId
+      user: userId,
     });
 
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found'
+        message: "Notification not found",
       });
     }
 
     notification.isRead = true;
+    notification.readAt = new Date();
     await notification.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Notification marked as read',
-      notification
+      message: "Notification marked as read",
+      notification,
     });
   } catch (error) {
-    console.error('Mark notification as read error:', error);
+    console.error("Mark notification as read error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -154,19 +222,24 @@ export const markAllAsRead = async (req, res) => {
 
     const result = await Notification.updateMany(
       { user: userId, isRead: false },
-      { $set: { isRead: true } }
+      {
+        $set: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      },
     );
 
     return res.status(200).json({
       success: true,
-      message: 'All notifications marked as read',
-      updatedCount: result.modifiedCount
+      message: "All notifications marked as read",
+      updatedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error('Mark all notifications as read error:', error);
+    console.error("Mark all notifications as read error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -179,25 +252,25 @@ export const deleteNotification = async (req, res) => {
 
     const notification = await Notification.findOneAndDelete({
       _id: notificationId,
-      user: userId
+      user: userId,
     });
 
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found'
+        message: "Notification not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Notification deleted successfully'
+      message: "Notification deleted successfully",
     });
   } catch (error) {
-    console.error('Delete notification error:', error);
+    console.error("Delete notification error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -211,14 +284,14 @@ export const deleteAllNotifications = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'All notifications deleted successfully',
-      deletedCount: result.deletedCount
+      message: "All notifications deleted successfully",
+      deletedCount: result.deletedCount,
     });
   } catch (error) {
-    console.error('Delete all notifications error:', error);
+    console.error("Delete all notifications error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -228,20 +301,100 @@ export const getNotificationCount = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const unreadCount = await Notification.countDocuments({ 
-      user: userId, 
-      isRead: false 
+    const unreadCount = await Notification.countDocuments({
+      user: userId,
+      isRead: false,
     });
 
     return res.status(200).json({
       success: true,
-      unreadCount
+      unreadCount,
     });
   } catch (error) {
-    console.error('Get notification count error:', error);
+    console.error("Get notification count error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: "Internal server error",
+    });
+  }
+};
+
+// ✅ NEW: Get notification by type (for filtering)
+export const getNotificationsByType = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { type } = req.params;
+    const { limit = 20, page = 1 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const notifications = await Notification.find({
+      user: userId,
+      type: type,
+    })
+      .populate({
+        path: "fromUser",
+        select: "username profilePicture",
+        options: { strictPopulate: false },
+      })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+
+    const totalCount = await Notification.countDocuments({
+      user: userId,
+      type: type,
+    });
+
+    return res.status(200).json({
+      success: true,
+      notifications,
+      totalCount,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      hasMore: totalCount > skip + notifications.length,
+    });
+  } catch (error) {
+    console.error("Get notifications by type error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// ✅ NEW: Get latest notifications (for real-time updates)
+export const getLatestNotifications = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { since } = req.query;
+
+    let query = { user: userId };
+
+    if (since) {
+      const sinceDate = new Date(parseInt(since));
+      query.createdAt = { $gt: sinceDate };
+    }
+
+    const notifications = await Notification.find(query)
+      .populate({
+        path: "fromUser",
+        select: "username profilePicture",
+        options: { strictPopulate: false },
+      })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    return res.status(200).json({
+      success: true,
+      notifications,
+      count: notifications.length,
+    });
+  } catch (error) {
+    console.error("Get latest notifications error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 };
