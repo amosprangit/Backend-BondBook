@@ -7,9 +7,13 @@ export const createNotification = async (
   userId,
   fromUserId,
   type,
+  title,
   message,
-  relatedId = null,
-  relatedModel = null,
+  category,
+  priority,
+  relatedId,
+  relatedModel,
+  extras,
 ) => {
   try {
     // Don't create notification if user is trying to notify themselves
@@ -17,13 +21,22 @@ export const createNotification = async (
       return null;
     }
 
+    // Generate a title if not provided
+    const notificationTitle = title || getDefaultTitle(type);
+
     const notification = await Notification.create({
       user: userId,
       fromUser: fromUserId,
       type,
+      title: notificationTitle, // ✅ ADDED: Include title field
       message,
+      category: category || "general",
+      priority: priority || "normal",
       relatedId,
       relatedModel,
+      isRead: false,
+      createdAt: new Date(),
+      ...extras, // Include any extra fields
     });
 
     // Populate fromUser before returning (if needed for real-time)
@@ -36,6 +49,32 @@ export const createNotification = async (
   }
 };
 
+// Helper function to get default title based on type
+function getDefaultTitle(type) {
+  const titleMap = {
+    follow_request: "New Follow Request",
+    follow: "New Follower",
+    like: "New Like",
+    comment: "New Comment",
+    reply: "New Reply",
+    mention: "New Mention",
+    reminder: "Reminder",
+    message: "New Message",
+    system: "System Notification",
+    alert: "Alert",
+    invitation: "New Invitation",
+    friend_request: "New Friend Request",
+    friend_accept: "Friend Request Accepted",
+    post: "New Post",
+    share: "New Share",
+    reaction: "New Reaction",
+    achievement: "Achievement Unlocked",
+    level_up: "Level Up",
+    badge: "New Badge",
+  };
+  return titleMap[type] || "New Notification";
+}
+
 // ✅ NEW: Create notification and send push notification
 export const createNotificationWithPush = async (
   recipientId,
@@ -47,48 +86,25 @@ export const createNotificationWithPush = async (
   additionalData = {},
 ) => {
   try {
-    // Don't create notification if user is trying to notify themselves
     if (recipientId.toString() === senderId?.toString()) {
       return null;
     }
 
-    // Get sender details for push notification
-    const sender = senderId ? await User.findById(senderId) : null;
-    const senderName = sender?.username || "Someone";
-
-    // Create notification in database
-    const notification = await createNotification(
-      recipientId,
-      senderId,
-      type,
+    // Ensure title is included in additionalData
+    const dataWithTitle = {
+      ...additionalData,
       message,
       relatedId,
       relatedModel,
+      title: additionalData.title || getDefaultTitle(type), // Add title if missing
+    };
+
+    return await sendNotificationWithType(
+      recipientId,
+      type,
+      dataWithTitle,
+      senderId,
     );
-
-    // Send push notification
-    try {
-      await sendNotificationWithType(
-        recipientId,
-        type,
-        {
-          ...additionalData,
-          notificationId: notification?._id,
-          relatedId,
-          relatedModel,
-          senderId,
-        },
-        senderId,
-      );
-    } catch (pushError) {
-      console.error(
-        "❌ Push notification failed but notification was saved:",
-        pushError,
-      );
-      // Don't throw - notification is already saved
-    }
-
-    return notification;
   } catch (error) {
     console.error("Error creating notification with push:", error);
     return null;

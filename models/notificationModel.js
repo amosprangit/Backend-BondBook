@@ -1,53 +1,121 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const notificationSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true // Index for faster queries
-  },
-  fromUser: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: function() {
-      // fromUser is not required for reminder_due notifications
-      return this.type !== 'reminder_due';
-    }
-  },
-  type: {
-    type: String,
-    enum: ['follow_request', 'follow_accepted', 'new_post', 'new_story', 'profile_update', 'merge_request', 'merge_request_accepted', 'merge_request_rejected', 'mutual_connection_created', 'mutual_connection_reactivated', 'reminder_due'],
-    required: true
-  },
-  message: {
-    type: String,
-    required: true
-  },
-  relatedId: {
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: 'relatedModel',
-    default: null
-  },
-  relatedModel: {
-    type: String,
-    enum: ['Post', 'Story', 'User', 'FollowRequest', 'MergeRequest', 'MutualConnection', 'Reminder', null],
-    default: null
-  },
-  isRead: {
-    type: Boolean,
-    default: false,
-    index: true
-  }
-}, { timestamps: true });
+const notificationSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
 
-// Index for faster queries - get unread notifications for a user
-notificationSchema.index({ user: 1, isRead: 1, createdAt: -1 });
+    fromUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: function () {
+        return this.type !== "reminder_due";
+      },
+      default: null,
+    },
 
-// Index for faster queries - get all notifications for a user
-notificationSchema.index({ user: 1, createdAt: -1 });
+    type: {
+      type: String,
+      required: true,
+      index: true,
+    },
 
-const Notification = mongoose.model('Notification', notificationSchema);
+    title: {
+      type: String,
+      required: true,
+    },
+
+    message: {
+      type: String,
+      required: true,
+    },
+
+    relatedId: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "relatedModel",
+      default: null,
+    },
+
+    relatedModel: {
+      type: String,
+      enum: [
+        "Post",
+        "Story",
+        "User",
+        "FollowRequest",
+        "MergeRequest",
+        "MutualConnection",
+        "Reminder",
+        "Message",
+        null,
+      ],
+      default: null,
+    },
+
+    category: {
+      type: String,
+      default: "social",
+      index: true,
+    },
+
+    priority: {
+      type: String,
+      enum: ["low", "normal", "high", "urgent"],
+      default: "normal",
+    },
+
+    extras: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Read Status
+    isRead: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    readAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+notificationSchema.index({
+  user: 1,
+  isRead: 1,
+  createdAt: -1,
+});
+
+// All notifications
+notificationSchema.index({
+  user: 1,
+  createdAt: -1,
+});
+
+// Notifications by type
+notificationSchema.index({
+  user: 1,
+  type: 1,
+  createdAt: -1,
+});
+
+// Notifications by category
+notificationSchema.index({
+  user: 1,
+  category: 1,
+  createdAt: -1,
+});
+
+const Notification = mongoose.model("Notification", notificationSchema);
 
 export default Notification;
-
