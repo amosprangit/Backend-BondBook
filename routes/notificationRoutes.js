@@ -28,256 +28,42 @@ notificationRouter.put("/read-all", userAuth, markAllAsRead);
 notificationRouter.delete("/:notificationId", userAuth, deleteNotification);
 notificationRouter.delete("/", userAuth, deleteAllNotifications);
 
-// ✅ TEST ROUTE: Send a single notification (Updated with ALL types)
-notificationRouter.post("/test", userAuth, async (req, res) => {
+// ✅ Helper function to validate required fields
+const validateRequiredFields = (fields, res) => {
+  for (const [field, value] of Object.entries(fields)) {
+    if (!value) {
+      return res.status(400).json({
+        success: false,
+        error: `❌ ${field} is required`,
+      });
+    }
+  }
+  return null;
+};
+
+// ✅ Helper function to send notification
+const sendTestNotification = async (
+  req,
+  res,
+  type,
+  requiredFields,
+  dataBuilder,
+) => {
   try {
-    const {
-      type,
-      recipientId,
-      senderId,
-      postId,
-      storyId,
-      commentId,
-      messageId,
-      mutualConnectionId,
-      mergeRequestId,
-      userId, // for follow/merge requests
-    } = req.body;
+    const { recipientId, senderId } = req.body;
 
-    // Validate required fields
-    if (!type) {
-      return res.status(400).json({
-        success: false,
-        error: "❌ Notification type is required",
-      });
-    }
+    // Validate recipientId
+    const validationError = validateRequiredFields({ recipientId }, res);
+    if (validationError) return validationError;
 
-    if (!recipientId) {
-      return res.status(400).json({
-        success: false,
-        error: "❌ recipientId is required",
-      });
-    }
-
-    // ✅ UPDATED: Complete list of all notification types
-    const validTypes = [
-      // Post & Story
-      "post_like",
-      "story_like",
-      "comment",
-      "comment_like",
-      "mention",
-      "new_post",
-      "new_story",
-
-      // Follow
-      "follow",
-      "follow_request",
-      "follow_accepted",
-
-      // Merge Request
-      "merge_request",
-      "merge_request_accepted",
-      "merge_request_rejected",
-
-      // Chat
-      "new_message",
-
-      // Profile
-      "profile_update",
-
-      // Reminder
-      "reminder_due",
-    ];
-
-    if (!validTypes.includes(type)) {
-      return res.status(400).json({
-        success: false,
-        error: `❌ Invalid notification type. Must be one of: ${validTypes.join(", ")}`,
-      });
-    }
-
-    // Build data object based on notification type
-    let data = {};
-    let notificationMessage = "";
+    // Validate type-specific required fields
+    const fieldValidation = validateRequiredFields(requiredFields, res);
+    if (fieldValidation) return fieldValidation;
 
     const sender = senderId || req.user.userId;
+    const data = dataBuilder(req.body, sender);
 
-    switch (type) {
-      // Post & Story Types
-      case "post_like":
-        if (!postId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ postId is required for post_like notification",
-          });
-        }
-        data = { postId };
-        notificationMessage = "Someone liked your post";
-        break;
-
-      case "story_like":
-        if (!storyId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ storyId is required for story_like notification",
-          });
-        }
-        data = { storyId };
-        notificationMessage = "Someone liked your story";
-        break;
-
-      case "comment":
-        if (!postId || !commentId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ postId and commentId are required for comment notification",
-          });
-        }
-        data = { postId, commentId };
-        notificationMessage = "Someone commented on your post";
-        break;
-
-      case "comment_like":
-        if (!postId || !commentId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ postId and commentId are required for comment_like notification",
-          });
-        }
-        data = { postId, commentId };
-        notificationMessage = "Someone liked your comment";
-        break;
-
-      case "mention":
-        if (!postId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ postId is required for mention notification",
-          });
-        }
-        data = { postId };
-        notificationMessage = "Someone mentioned you in a post";
-        break;
-
-      case "new_post":
-        if (!postId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ postId is required for new_post notification",
-          });
-        }
-        data = { postId };
-        notificationMessage = "Someone created a new post";
-        break;
-
-      case "new_story":
-        if (!storyId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ storyId is required for new_story notification",
-          });
-        }
-        data = { storyId };
-        notificationMessage = "Someone created a new story";
-        break;
-
-      // Follow Types
-      case "follow":
-        data = { userId: userId || sender };
-        notificationMessage = "Started following you";
-        break;
-
-      case "follow_request":
-        data = { userId: userId || sender };
-        notificationMessage = "Sent you a follow request";
-        break;
-
-      case "follow_accepted":
-        data = { userId: userId || sender };
-        notificationMessage = "Accepted your follow request";
-        break;
-
-      // Merge Request Types
-      case "merge_request":
-        if (!mergeRequestId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ mergeRequestId is required for merge_request notification",
-          });
-        }
-        data = { mergeRequestId, userId: userId || sender };
-        notificationMessage = "Wants to connect with you";
-        break;
-
-      case "merge_request_accepted":
-        if (!mergeRequestId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ mergeRequestId is required for merge_request_accepted notification",
-          });
-        }
-        data = { mergeRequestId, userId: userId || sender };
-        notificationMessage = "Accepted your connection request";
-        break;
-
-      case "merge_request_rejected":
-        if (!mergeRequestId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ mergeRequestId is required for merge_request_rejected notification",
-          });
-        }
-        data = { mergeRequestId, userId: userId || sender };
-        notificationMessage = "Declined your connection request";
-        break;
-
-      // Chat Types
-      case "new_message":
-        if (!mutualConnectionId) {
-          return res.status(400).json({
-            success: false,
-            error:
-              "❌ mutualConnectionId is required for new_message notification",
-          });
-        }
-        if (!messageId) {
-          return res.status(400).json({
-            success: false,
-            error: "❌ messageId is required for new_message notification",
-          });
-        }
-        data = {
-          mutualConnectionId,
-          messageId,
-          senderId: sender,
-        };
-        notificationMessage = "Sent you a message";
-        break;
-
-      case "profile_update":
-        data = { userId: userId || sender };
-        notificationMessage = "Updated their profile";
-        break;
-
-      case "reminder_due":
-        data = {};
-        notificationMessage = "You have a reminder due";
-        break;
-
-      default:
-        data = {};
-        notificationMessage = "You have a new notification";
-    }
-
-    // Send the notification
-    console.log("📤 Sending test notification...");
-    console.log("  - Type:", type);
+    console.log(`📤 Sending ${type} notification...`);
     console.log("  - Recipient:", recipientId);
     console.log("  - Sender:", sender);
     console.log("  - Data:", data);
@@ -296,20 +82,246 @@ notificationRouter.post("/test", userAuth, async (req, res) => {
       senderId: sender,
       type,
       data,
-      notificationMessage,
       result,
     });
   } catch (error) {
-    console.error("❌ Test notification error:", error);
+    console.error(`❌ ${type} notification error:`, error);
     res.status(500).json({
       success: false,
       error: error.message,
     });
   }
+};
+
+// ============================================
+// 📝 POST & STORY NOTIFICATIONS
+// ============================================
+
+// ✅ Post Like
+notificationRouter.post("/post-like", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "post_like",
+    { postId: req.body.postId },
+    (body) => ({ postId: body.postId }),
+  );
 });
 
-// ✅ TEST ROUTE: Send all notification types (Updated)
-notificationRouter.post("/test-all", userAuth, async (req, res) => {
+// ✅ Story Like
+notificationRouter.post("/story-like", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "story_like",
+    { storyId: req.body.storyId },
+    (body) => ({ storyId: body.storyId }),
+  );
+});
+
+// ✅ Comment
+notificationRouter.post("/comment", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "comment",
+    { postId: req.body.postId, commentId: req.body.commentId },
+    (body) => ({ postId: body.postId, commentId: body.commentId }),
+  );
+});
+
+// ✅ Comment Like
+notificationRouter.post("/comment-like", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "comment_like",
+    { postId: req.body.postId, commentId: req.body.commentId },
+    (body) => ({ postId: body.postId, commentId: body.commentId }),
+  );
+});
+
+// ✅ Mention
+notificationRouter.post("/mention", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "mention",
+    { postId: req.body.postId },
+    (body) => ({ postId: body.postId }),
+  );
+});
+
+// ✅ New Post
+notificationRouter.post("/new-post", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "new_post",
+    { postId: req.body.postId },
+    (body) => ({ postId: body.postId }),
+  );
+});
+
+// ✅ New Story
+notificationRouter.post("/new-story", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "new_story",
+    { storyId: req.body.storyId },
+    (body) => ({ storyId: body.storyId }),
+  );
+});
+
+// ============================================
+// 👥 FOLLOW NOTIFICATIONS
+// ============================================
+
+// ✅ Follow
+notificationRouter.post("/follow", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "follow",
+    { userId: req.body.userId || req.user.userId },
+    (body, sender) => ({ userId: body.userId || sender }),
+  );
+});
+
+// ✅ Follow Request
+notificationRouter.post("/follow-request", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "follow_request",
+    { userId: req.body.userId || req.user.userId },
+    (body, sender) => ({ userId: body.userId || sender }),
+  );
+});
+
+// ✅ Follow Accepted
+notificationRouter.post("/follow-accepted", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "follow_accepted",
+    { userId: req.body.userId || req.user.userId },
+    (body, sender) => ({ userId: body.userId || sender }),
+  );
+});
+
+// ============================================
+// 🔗 MERGE REQUEST NOTIFICATIONS
+// ============================================
+
+// ✅ Merge Request
+notificationRouter.post("/merge-request", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "merge_request",
+    { mergeRequestId: req.body.mergeRequestId },
+    (body, sender) => ({
+      mergeRequestId: body.mergeRequestId,
+      userId: body.userId || sender,
+    }),
+  );
+});
+
+// ✅ Merge Request Accepted
+notificationRouter.post(
+  "/merge-request-accepted",
+  userAuth,
+  (req, res) => {
+    sendTestNotification(
+      req,
+      res,
+      "merge_request_accepted",
+      { mergeRequestId: req.body.mergeRequestId },
+      (body, sender) => ({
+        mergeRequestId: body.mergeRequestId,
+        userId: body.userId || sender,
+      }),
+    );
+  },
+);
+
+// ✅ Merge Request Rejected
+notificationRouter.post(
+  "/merge-request-rejected",
+  userAuth,
+  (req, res) => {
+    sendTestNotification(
+      req,
+      res,
+      "merge_request_rejected",
+      { mergeRequestId: req.body.mergeRequestId },
+      (body, sender) => ({
+        mergeRequestId: body.mergeRequestId,
+        userId: body.userId || sender,
+      }),
+    );
+  },
+);
+
+// ============================================
+// 💬 CHAT NOTIFICATIONS
+// ============================================
+
+// ✅ New Message
+notificationRouter.post("/new-message", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "new_message",
+    {
+      mutualConnectionId: req.body.mutualConnectionId,
+      messageId: req.body.messageId,
+    },
+    (body, sender) => ({
+      mutualConnectionId: body.mutualConnectionId,
+      messageId: body.messageId,
+      senderId: sender,
+    }),
+  );
+});
+
+// ============================================
+// 👤 PROFILE NOTIFICATIONS
+// ============================================
+
+// ✅ Profile Update
+notificationRouter.post("/profile-update", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "profile_update",
+    { userId: req.body.userId || req.user.userId },
+    (body, sender) => ({ userId: body.userId || sender }),
+  );
+});
+
+// ============================================
+// ⏰ REMINDER NOTIFICATIONS
+// ============================================
+
+// ✅ Reminder Due
+notificationRouter.post("/reminder-due", userAuth, (req, res) => {
+  sendTestNotification(
+    req,
+    res,
+    "reminder_due",
+    {}, // No required fields
+    () => ({}), // No data needed
+  );
+});
+
+// ============================================
+// 🧪 TEST ALL (Keep for convenience)
+// ============================================
+
+notificationRouter.post("-all", userAuth, async (req, res) => {
   try {
     const {
       recipientId,
@@ -333,77 +345,76 @@ notificationRouter.post("/test-all", userAuth, async (req, res) => {
     const sender = senderId || req.user.userId;
     const results = [];
 
-    // ✅ ALL notification types
+    // ✅ ALL notification types with their required data
     const testCases = [
       // Post & Story
-      { type: "post_like", data: { postId } },
-      { type: "story_like", data: { storyId } },
-      { type: "comment", data: { postId, commentId } },
-      { type: "comment_like", data: { postId, commentId } },
-      { type: "mention", data: { postId } },
-      { type: "new_post", data: { postId } },
-      { type: "new_story", data: { storyId } },
+      { type: "post_like", data: { postId }, required: !!postId },
+      { type: "story_like", data: { storyId }, required: !!storyId },
+      {
+        type: "comment",
+        data: { postId, commentId },
+        required: !!(postId && commentId),
+      },
+      {
+        type: "comment_like",
+        data: { postId, commentId },
+        required: !!(postId && commentId),
+      },
+      { type: "mention", data: { postId }, required: !!postId },
+      { type: "new_post", data: { postId }, required: !!postId },
+      { type: "new_story", data: { storyId }, required: !!storyId },
 
       // Follow
-      { type: "follow", data: { userId: userId || sender } },
-      { type: "follow_request", data: { userId: userId || sender } },
-      { type: "follow_accepted", data: { userId: userId || sender } },
+      { type: "follow", data: { userId: userId || sender }, required: true },
+      {
+        type: "follow_request",
+        data: { userId: userId || sender },
+        required: true,
+      },
+      {
+        type: "follow_accepted",
+        data: { userId: userId || sender },
+        required: true,
+      },
 
       // Merge Request
       {
         type: "merge_request",
         data: { mergeRequestId, userId: userId || sender },
+        required: !!mergeRequestId,
       },
       {
         type: "merge_request_accepted",
         data: { mergeRequestId, userId: userId || sender },
+        required: !!mergeRequestId,
       },
       {
         type: "merge_request_rejected",
         data: { mergeRequestId, userId: userId || sender },
+        required: !!mergeRequestId,
       },
 
       // Chat
       {
         type: "new_message",
         data: { mutualConnectionId, messageId, senderId: sender },
+        required: !!(mutualConnectionId && messageId),
       },
 
       // Profile
-      { type: "profile_update", data: { userId: userId || sender } },
+      {
+        type: "profile_update",
+        data: { userId: userId || sender },
+        required: true,
+      },
 
       // Reminder
-      { type: "reminder_due", data: {} },
+      { type: "reminder_due", data: {}, required: true },
     ];
 
-    // Send each notification
+    // Send each notification if required data is present
     for (const testCase of testCases) {
-      // Skip if required data is missing
-      if (testCase.type === "post_like" && !postId) continue;
-      if (testCase.type === "story_like" && !storyId) continue;
-      if (
-        (testCase.type === "comment" || testCase.type === "comment_like") &&
-        (!postId || !commentId)
-      )
-        continue;
-      if (
-        (testCase.type === "mention" || testCase.type === "new_post") &&
-        !postId
-      )
-        continue;
-      if (testCase.type === "new_story" && !storyId) continue;
-      if (
-        (testCase.type === "merge_request" ||
-          testCase.type === "merge_request_accepted" ||
-          testCase.type === "merge_request_rejected") &&
-        !mergeRequestId
-      )
-        continue;
-      if (
-        testCase.type === "new_message" &&
-        (!mutualConnectionId || !messageId)
-      )
-        continue;
+      if (!testCase.required) continue;
 
       try {
         console.log(`📤 Sending ${testCase.type}...`);
