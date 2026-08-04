@@ -98,7 +98,7 @@ const sendTestNotification = async (
 // ============================================
 
 // ✅ Post Like
-notificationRouter.post("/post-like", userAuth, (req, res) => {
+notificationRouter.post("/test/post-like", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -109,7 +109,7 @@ notificationRouter.post("/post-like", userAuth, (req, res) => {
 });
 
 // ✅ Story Like
-notificationRouter.post("/story-like", userAuth, (req, res) => {
+notificationRouter.post("/test/story-like", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -120,7 +120,7 @@ notificationRouter.post("/story-like", userAuth, (req, res) => {
 });
 
 // ✅ Comment
-notificationRouter.post("/comment", userAuth, (req, res) => {
+notificationRouter.post("/test/comment", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -131,7 +131,7 @@ notificationRouter.post("/comment", userAuth, (req, res) => {
 });
 
 // ✅ Comment Like
-notificationRouter.post("/comment-like", userAuth, (req, res) => {
+notificationRouter.post("/test/comment-like", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -142,7 +142,7 @@ notificationRouter.post("/comment-like", userAuth, (req, res) => {
 });
 
 // ✅ Mention
-notificationRouter.post("/mention", userAuth, (req, res) => {
+notificationRouter.post("/test/mention", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -153,7 +153,7 @@ notificationRouter.post("/mention", userAuth, (req, res) => {
 });
 
 // ✅ New Post
-notificationRouter.post("/new-post", userAuth, (req, res) => {
+notificationRouter.post("/test/new-post", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -164,7 +164,7 @@ notificationRouter.post("/new-post", userAuth, (req, res) => {
 });
 
 // ✅ New Story
-notificationRouter.post("/new-story", userAuth, (req, res) => {
+notificationRouter.post("/test/new-story", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -179,7 +179,7 @@ notificationRouter.post("/new-story", userAuth, (req, res) => {
 // ============================================
 
 // ✅ Follow
-notificationRouter.post("/follow", userAuth, (req, res) => {
+notificationRouter.post("/test/follow", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -190,7 +190,7 @@ notificationRouter.post("/follow", userAuth, (req, res) => {
 });
 
 // ✅ Follow Request
-notificationRouter.post("/follow-request", userAuth, (req, res) => {
+notificationRouter.post("/test/follow-request", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -201,7 +201,7 @@ notificationRouter.post("/follow-request", userAuth, (req, res) => {
 });
 
 // ✅ Follow Accepted
-notificationRouter.post("/follow-accepted", userAuth, (req, res) => {
+notificationRouter.post("/test/follow-accepted", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -216,7 +216,7 @@ notificationRouter.post("/follow-accepted", userAuth, (req, res) => {
 // ============================================
 
 // ✅ Merge Request
-notificationRouter.post("/merge-request", userAuth, (req, res) => {
+notificationRouter.post("/test/merge-request", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -231,7 +231,7 @@ notificationRouter.post("/merge-request", userAuth, (req, res) => {
 
 // ✅ Merge Request Accepted
 notificationRouter.post(
-  "/merge-request-accepted",
+  "/test/merge-request-accepted",
   userAuth,
   (req, res) => {
     sendTestNotification(
@@ -249,7 +249,7 @@ notificationRouter.post(
 
 // ✅ Merge Request Rejected
 notificationRouter.post(
-  "/merge-request-rejected",
+  "/test/merge-request-rejected",
   userAuth,
   (req, res) => {
     sendTestNotification(
@@ -270,7 +270,7 @@ notificationRouter.post(
 // ============================================
 
 // ✅ New Message
-notificationRouter.post("/new-message", userAuth, (req, res) => {
+notificationRouter.post("/test/new-message", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -292,7 +292,7 @@ notificationRouter.post("/new-message", userAuth, (req, res) => {
 // ============================================
 
 // ✅ Profile Update
-notificationRouter.post("/profile-update", userAuth, (req, res) => {
+notificationRouter.post("/test/profile-update", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -307,7 +307,7 @@ notificationRouter.post("/profile-update", userAuth, (req, res) => {
 // ============================================
 
 // ✅ Reminder Due
-notificationRouter.post("/reminder-due", userAuth, (req, res) => {
+notificationRouter.post("/test/reminder-due", userAuth, (req, res) => {
   sendTestNotification(
     req,
     res,
@@ -321,7 +321,7 @@ notificationRouter.post("/reminder-due", userAuth, (req, res) => {
 // 🧪 TEST ALL (Keep for convenience)
 // ============================================
 
-notificationRouter.post("-all", userAuth, async (req, res) => {
+notificationRouter.post("/test-all", userAuth, async (req, res) => {
   try {
     const {
       recipientId,
