@@ -31,6 +31,7 @@ import {
 } from '../controllers/UserController.js';
 import userAuth from '../middleware/userAuth.js';
 import upload from '../middleware/upload.js';
+import { googleAuth } from '../controllers/AuthController.js';
 
 
 const userRouter = express.Router();
@@ -44,6 +45,7 @@ userRouter.post('/forgot-password', forgotPassword);
 userRouter.post('/reset-password', resetPassword);
 userRouter.post('/verify-reset-otp', verifyResetOTP);
 userRouter.post('/logout', logoutUser);
+userRouter.post("/google", googleAuth);
 
 // Protected routes (authentication required)
 userRouter.get('/profile', userAuth, getCurrentUser);
