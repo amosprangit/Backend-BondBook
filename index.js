@@ -15,7 +15,7 @@ import { startAutoCleanup } from "./controllers/storyController.js";
 import { startReminderCheckJob } from "./controllers/reminderController.js";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { createGroup } from "./controllers/GroupController.js";
+import groupRoute from "./routes/GroupRoute.js";
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -41,7 +41,7 @@ app.use("/api/stories", storyRouter);
 app.use("/api/reminders", reminderRouter);
 app.use("/api/notifications", notificationRouter);
 app.use("/api/mutual-connections", mutualConnectionRouter);
-app.use('/api/groups', createGroup);
+app.use('/api/groups', groupRoute);
 
 const PORT = process.env.PORT;
 const dbURI = process.env.MONGODB_URI;
