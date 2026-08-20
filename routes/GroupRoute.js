@@ -10,7 +10,7 @@ import {
   deleteGroup
 } from '../controllers/groupController.js';
 
-import authMiddleware from '../middleware/authMiddleware.js';
+import authMiddleware from '../middleware/userAuth.js';
 
 const router = express.Router();
 
