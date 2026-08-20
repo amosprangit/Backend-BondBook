@@ -1,4 +1,3 @@
-// controllers/authController.js
 import mongoose from "mongoose";
 import User from "../models/userModel.js";
 import jwt from "jsonwebtoken";
@@ -6,8 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 
 // Initialize Google OAuth client
 const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
 );
 
 // Generate JWT token (matching your existing token generation)
@@ -39,7 +37,7 @@ export const googleAuth = async (req, res) => {
       try {
         const ticket = await googleClient.verifyIdToken({
           idToken: idToken,
-          audience: process.env.GOOGLE_CLIENT_ID,
+          audience: process.env.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
         });
 
         const payload = ticket.getPayload();
